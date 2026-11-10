@@ -1,0 +1,41 @@
+# .NET / C#
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.suo
+*.userprefs
+TestResults/
+[Bb]uild[Ll]og.*
+*.nupkg
+*.snupkg
+
+# BenchmarkDotNet artifacts
+BenchmarkDotNet.Artifacts/
+
+# Node / Web Frontend
+node_modules/
+dist/
+build/
+.npm
+.yarn/
+*.log
+
+# Docker / Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.ports
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Aspire / Diagnostics
+.aspire/

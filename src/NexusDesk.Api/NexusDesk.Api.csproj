@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>NexusDesk.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NexusDesk.ServiceDefaults\NexusDesk.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\NexusDesk.SharedKernel\NexusDesk.SharedKernel.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Tenants\NexusDesk.Modules.Tenants.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Identity\NexusDesk.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Ticketing\NexusDesk.Modules.Ticketing.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Chat\NexusDesk.Modules.Chat.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.KnowledgeBase\NexusDesk.Modules.KnowledgeBase.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Automation\NexusDesk.Modules.Automation.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Billing\NexusDesk.Modules.Billing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+
+</Project>

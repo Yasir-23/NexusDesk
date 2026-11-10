@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  nexusdesk-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nexusdesk-postgres
+    restart: unless-stopped
+    ports:
+      - "${NEXUSDESK_POSTGRES_PORT:-56132}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nexusdesk_shared
+    volumes:
+      - nexusdesk_pgdata:/var/lib/postgresql/data
+      - ./infra/docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexusdesk_shared"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  nexusdesk-redis:
+    image: redis:7-alpine
+    container_name: nexusdesk-redis
+    restart: unless-stopped
+    ports:
+      - "${NEXUSDESK_REDIS_PORT:-56179}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  nexusdesk_pgdata:
+    name: nexusdesk_pgdata

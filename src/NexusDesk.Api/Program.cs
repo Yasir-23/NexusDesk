@@ -1,0 +1,141 @@
+using System.Runtime.InteropServices;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using NexusDesk.Api.Infrastructure;
+using NexusDesk.Modules.Automation;
+using NexusDesk.Modules.Billing;
+using NexusDesk.Modules.Chat;
+using NexusDesk.Modules.Identity;
+using NexusDesk.Modules.KnowledgeBase;
+using NexusDesk.Modules.Tenants;
+using NexusDesk.Modules.Ticketing;
+using NexusDesk.ServiceDefaults;
+using NexusDesk.SharedKernel.Modules;
+using StackExchange.Redis;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. Service Defaults (OpenTelemetry, Resilience, Health Checks, Service Discovery)
+builder.AddServiceDefaults();
+
+// 2. Exception Handling
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// 3. OpenAPI / Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "NexusDesk API",
+        Version = "v1",
+        Description = "NexusDesk Multi-Tenant Cloud-Native SaaS Helpdesk Platform"
+    });
+});
+
+// 4. Database & Cache Connection Resolution
+var postgresHost = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
+var postgresPort = Environment.GetEnvironmentVariable("NEXUSDESK_POSTGRES_PORT") ?? "56132";
+var postgresUser = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
+var postgresPass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres";
+var postgresDb = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "nexusdesk_shared";
+
+var defaultPgConn = $"Host={postgresHost};Port={postgresPort};Database={postgresDb};Username={postgresUser};Password={postgresPass}";
+var pgConnectionString = builder.Configuration.GetConnectionString("PostgreSql") ?? defaultPgConn;
+
+var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
+var redisPort = Environment.GetEnvironmentVariable("NEXUSDESK_REDIS_PORT") ?? "56179";
+var defaultRedisConn = $"{redisHost}:{redisPort}";
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? defaultRedisConn;
+
+// 5. Readiness Probes (PostgreSQL + vector extension probe & Redis ping)
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        connectionString: pgConnectionString,
+        healthQuery: "SELECT 1 FROM pg_extension WHERE extname = 'vector';",
+        name: "postgresql",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"])
+    .AddRedis(
+        redisConnectionString: redisConnectionString,
+        name: "redis",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"]);
+
+// 6. Register Modules
+var moduleRegistry = new ModuleRegistry();
+builder.Services.AddSingleton<IModuleRegistry>(moduleRegistry);
+
+IModuleInstaller[] installers =
+[
+    new TenantsModuleInstaller(),
+    new IdentityModuleInstaller(),
+    new TicketingModuleInstaller(),
+    new ChatModuleInstaller(),
+    new KnowledgeBaseModuleInstaller(),
+    new AutomationModuleInstaller(),
+    new BillingModuleInstaller()
+];
+
+foreach (var installer in installers)
+{
+    installer.Install(builder.Services, builder.Configuration);
+    moduleRegistry.RegisterModule(installer.ModuleName);
+}
+
+var app = builder.Build();
+
+// Configure Middleware Pipeline
+app.UseExceptionHandler();
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "NexusDesk API v1");
+    c.RoutePrefix = "swagger";
+});
+
+// Map Default Health Check Endpoints (/health/live, /health/ready)
+app.MapDefaultEndpoints();
+
+// Metadata & Diagnostic Endpoint
+app.MapGet("/api/v1/system/info", async (
+    IModuleRegistry registry,
+    IConfiguration config,
+    IWebHostEnvironment env,
+    HealthCheckService healthCheckService) =>
+{
+    var healthReport = await healthCheckService.CheckHealthAsync();
+
+    var postgresStatus = healthReport.Entries.TryGetValue("postgresql", out var pgEntry)
+        ? pgEntry.Status.ToString()
+        : "Unknown";
+
+    var redisStatus = healthReport.Entries.TryGetValue("redis", out var rEntry)
+        ? rEntry.Status.ToString()
+        : "Unknown";
+
+    return Results.Ok(new
+    {
+        application = "NexusDesk.Api",
+        environment = env.EnvironmentName,
+        framework = RuntimeInformation.FrameworkDescription,
+        osVersion = RuntimeInformation.OSDescription,
+        processArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
+        loadedModules = registry.RegisteredModules,
+        connectivity = new
+        {
+            overall = healthReport.Status.ToString(),
+            postgresql = postgresStatus,
+            redis = redisStatus
+        },
+        timestampUtc = DateTimeOffset.UtcNow
+    });
+})
+.WithName("GetSystemInfo")
+.WithOpenApi();
+
+app.Run();
+
+public partial class Program;

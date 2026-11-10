@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:56100",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "NEXUSDESK_API_HTTP_PORT": "56100",
+        "NEXUSDESK_POSTGRES_PORT": "56132",
+        "NEXUSDESK_REDIS_PORT": "56179"
+      }
+    }
+  }
+}
