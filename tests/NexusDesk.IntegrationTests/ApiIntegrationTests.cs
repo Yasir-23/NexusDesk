@@ -10,8 +10,8 @@ namespace NexusDesk.IntegrationTests;
 public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
-    private const string PostgresConnectionString = "Host=localhost;Port=56132;Database=nexusdesk_shared;Username=postgres;Password=postgres";
-    private const string RedisConnectionString = "localhost:56179";
+    private const string PostgresConnectionString = "Host=127.0.0.1;Port=56132;Database=nexusdesk_shared;Username=postgres;Password=postgres;SSL Mode=Disable";
+    private const string RedisConnectionString = "127.0.0.1:56179,abortConnect=false";
 
     public ApiIntegrationTests(WebApplicationFactory<Program> factory)
     {

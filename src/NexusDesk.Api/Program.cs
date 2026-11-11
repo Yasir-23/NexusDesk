@@ -8,6 +8,9 @@ using NexusDesk.Modules.Chat;
 using NexusDesk.Modules.Identity;
 using NexusDesk.Modules.KnowledgeBase;
 using NexusDesk.Modules.Tenants;
+using NexusDesk.Modules.Tenants.Endpoints;
+using NexusDesk.Modules.Tenants.Middleware;
+using NexusDesk.Modules.Tenants.Persistence;
 using NexusDesk.Modules.Ticketing;
 using NexusDesk.ServiceDefaults;
 using NexusDesk.SharedKernel.Modules;
@@ -41,13 +44,20 @@ var postgresUser = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postg
 var postgresPass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres";
 var postgresDb = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "nexusdesk_shared";
 
-var defaultPgConn = $"Host={postgresHost};Port={postgresPort};Database={postgresDb};Username={postgresUser};Password={postgresPass}";
+var defaultPgConn = $"Host={postgresHost};Port={postgresPort};Database={postgresDb};Username={postgresUser};Password={postgresPass};SSL Mode=Disable";
 var pgConnectionString = builder.Configuration.GetConnectionString("PostgreSql") ?? defaultPgConn;
 
-var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
+var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "127.0.0.1";
 var redisPort = Environment.GetEnvironmentVariable("NEXUSDESK_REDIS_PORT") ?? "56179";
-var defaultRedisConn = $"{redisHost}:{redisPort}";
+var defaultRedisConn = $"{redisHost}:{redisPort},abortConnect=false";
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? defaultRedisConn;
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+{
+    var config = ConfigurationOptions.Parse(redisConnectionString);
+    config.AbortOnConnectFail = false;
+    return ConnectionMultiplexer.Connect(config);
+});
 
 // 5. Readiness Probes (PostgreSQL + vector extension probe & Redis ping)
 builder.Services.AddHealthChecks()
@@ -58,7 +68,7 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Unhealthy,
         tags: ["ready"])
     .AddRedis(
-        redisConnectionString: redisConnectionString,
+        redisConnectionString: redisConnectionString.Contains("abortConnect") ? redisConnectionString : $"{redisConnectionString},abortConnect=false",
         name: "redis",
         failureStatus: HealthStatus.Unhealthy,
         tags: ["ready"]);
@@ -86,6 +96,16 @@ foreach (var installer in installers)
 
 var app = builder.Build();
 
+// Run Tenant Schema Initializer
+using (var scope = app.Services.CreateScope())
+{
+    var initializer = scope.ServiceProvider.GetService<ITenantSchemaInitializer>();
+    if (initializer != null)
+    {
+        await initializer.InitializeAsync();
+    }
+}
+
 // Configure Middleware Pipeline
 app.UseExceptionHandler();
 
@@ -98,6 +118,12 @@ app.UseSwaggerUI(c =>
 
 // Map Default Health Check Endpoints (/health/live, /health/ready)
 app.MapDefaultEndpoints();
+
+// Tenant Resolution Middleware
+app.UseMiddleware<TenantResolutionMiddleware>();
+
+// Tenant Management & Verification REST APIs
+app.MapTenantEndpoints();
 
 // Metadata & Diagnostic Endpoint
 app.MapGet("/api/v1/system/info", async (

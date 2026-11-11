@@ -80,4 +80,55 @@ public class ArchitectureTests
             }
         }
     }
+
+    [Fact]
+    public void AllDomainEntities_WithTenantIdProperty_MustImplementITenantScoped()
+    {
+        var assembliesToScan = ModuleAssemblies;
+
+        foreach (var assembly in assembliesToScan)
+        {
+            var typesWithTenantId = assembly.GetTypes()
+                .Where(t => t.IsClass && !t.IsAbstract &&
+                            t.Namespace != null && t.Namespace.EndsWith(".Domain") &&
+                            !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false) &&
+                            t.Name != "Tenant" && t.Name != "TenantAuditLog" &&
+                            t.GetProperty("TenantId") != null)
+                .ToList();
+
+            foreach (var type in typesWithTenantId)
+            {
+                typeof(ITenantScoped).IsAssignableFrom(type)
+                    .Should().BeTrue($"Class '{type.FullName}' declares a 'TenantId' property and MUST implement ITenantScoped.");
+            }
+        }
+    }
+
+    [Fact]
+    public void Codebase_MustNotContain_UnapprovedIgnoreQueryFiltersCalls()
+    {
+        // Scan all .cs files in src/
+        var solutionRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var srcDir = Path.Combine(solutionRoot, "src");
+
+        var csFiles = Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains("\\bin\\") && !f.Contains("\\obj\\") && !f.Contains("IgnoreQueryFiltersTenantAnalyzer.cs"))
+            .ToList();
+
+        var violations = new List<string>();
+
+        foreach (var file in csFiles)
+        {
+            var content = File.ReadAllText(file);
+            if (content.Contains(".IgnoreQueryFilters()"))
+            {
+                if (!content.Contains("AllowCrossTenantQuery"))
+                {
+                    violations.Add(file);
+                }
+            }
+        }
+
+        violations.Should().BeEmpty("Calling .IgnoreQueryFilters() without [AllowCrossTenantQuery] is prohibited across all modules.");
+    }
 }

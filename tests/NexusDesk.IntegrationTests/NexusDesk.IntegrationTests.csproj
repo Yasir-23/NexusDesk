@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NexusDesk.Api\NexusDesk.Api.csproj" />
+    <ProjectReference Include="..\..\src\NexusDesk.SharedKernel\NexusDesk.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Tenants\NexusDesk.Modules.Tenants.csproj" />
   </ItemGroup>
 
   <ItemGroup>

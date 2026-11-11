@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NexusDesk.SharedKernel\NexusDesk.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\NexusDesk.Analyzers\NexusDesk.Analyzers.csproj" />
     <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Tenants\NexusDesk.Modules.Tenants.csproj" />
     <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Identity\NexusDesk.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Ticketing\NexusDesk.Modules.Ticketing.csproj" />
@@ -23,6 +24,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
 </Project>
