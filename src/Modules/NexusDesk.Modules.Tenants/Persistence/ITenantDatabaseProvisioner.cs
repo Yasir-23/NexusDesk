@@ -87,6 +87,7 @@ public sealed class TenantDatabaseProvisioner : ITenantDatabaseProvisioner
 
                 CREATE SCHEMA IF NOT EXISTS tenants;
                 CREATE SCHEMA IF NOT EXISTS identity;
+                CREATE SCHEMA IF NOT EXISTS ticketing;
                 CREATE SCHEMA IF NOT EXISTS app;
 
                 CREATE TABLE IF NOT EXISTS identity.users (
@@ -221,6 +222,120 @@ public sealed class TenantDatabaseProvisioner : ITenantDatabaseProvisioner
                 CREATE POLICY tenant_isolation_policy ON tenants.tenant_settings
                     USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
                     WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+                CREATE TABLE IF NOT EXISTS ticketing.tickets (
+                    id uuid PRIMARY KEY,
+                    tenant_id uuid NOT NULL,
+                    ticket_number varchar(32) NOT NULL,
+                    title varchar(200) NOT NULL,
+                    description text NOT NULL,
+                    status int NOT NULL,
+                    priority int NOT NULL,
+                    channel int NOT NULL,
+                    customer_id uuid NOT NULL,
+                    assigned_agent_id uuid NULL,
+                    resolution_notes text NULL,
+                    first_response_due_utc timestamptz NULL,
+                    resolution_due_utc timestamptz NULL,
+                    first_responded_at_utc timestamptz NULL,
+                    resolved_at_utc timestamptz NULL,
+                    closed_at_utc timestamptz NULL,
+                    created_at_utc timestamptz NOT NULL,
+                    updated_at_utc timestamptz NULL
+                );
+
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_tickets_tenant_ticket_number ON ticketing.tickets (tenant_id, ticket_number);
+                CREATE INDEX IF NOT EXISTS ix_tickets_tenant_status ON ticketing.tickets (tenant_id, status);
+                CREATE INDEX IF NOT EXISTS ix_tickets_tenant_assigned_agent ON ticketing.tickets (tenant_id, assigned_agent_id);
+                CREATE INDEX IF NOT EXISTS ix_tickets_tenant_customer ON ticketing.tickets (tenant_id, customer_id);
+                CREATE INDEX IF NOT EXISTS ix_tickets_tenant_created_at ON ticketing.tickets (tenant_id, created_at_utc);
+
+                CREATE TABLE IF NOT EXISTS ticketing.ticket_comments (
+                    id uuid PRIMARY KEY,
+                    tenant_id uuid NOT NULL,
+                    ticket_id uuid NOT NULL REFERENCES ticketing.tickets(id) ON DELETE CASCADE,
+                    author_user_id uuid NOT NULL,
+                    is_customer boolean NOT NULL,
+                    type int NOT NULL,
+                    body text NOT NULL,
+                    created_at_utc timestamptz NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_ticket_comments_tenant_ticket ON ticketing.ticket_comments (tenant_id, ticket_id);
+                CREATE INDEX IF NOT EXISTS "IX_ticket_comments_ticket_id" ON ticketing.ticket_comments (ticket_id);
+
+                CREATE TABLE IF NOT EXISTS ticketing.ticket_activity_logs (
+                    id uuid PRIMARY KEY,
+                    tenant_id uuid NOT NULL,
+                    ticket_id uuid NOT NULL REFERENCES ticketing.tickets(id) ON DELETE CASCADE,
+                    performed_by_user_id uuid NOT NULL,
+                    action varchar(64) NOT NULL,
+                    old_value text NULL,
+                    new_value text NULL,
+                    timestamp_utc timestamptz NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_ticket_activity_logs_tenant_ticket ON ticketing.ticket_activity_logs (tenant_id, ticket_id);
+                CREATE INDEX IF NOT EXISTS "IX_ticket_activity_logs_ticket_id" ON ticketing.ticket_activity_logs (ticket_id);
+
+                CREATE TABLE IF NOT EXISTS ticketing.ticket_tags (
+                    id uuid PRIMARY KEY,
+                    tenant_id uuid NOT NULL,
+                    ticket_id uuid NOT NULL REFERENCES ticketing.tickets(id) ON DELETE CASCADE,
+                    name varchar(64) NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_ticket_tags_tenant_ticket ON ticketing.ticket_tags (tenant_id, ticket_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_ticket_tags_ticket_name ON ticketing.ticket_tags (ticket_id, name);
+
+                CREATE TABLE IF NOT EXISTS ticketing.ticket_sequences (
+                    tenant_id uuid PRIMARY KEY,
+                    last_number bigint NOT NULL DEFAULT 1000
+                );
+
+                ALTER TABLE ticketing.tickets ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE ticketing.tickets FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON ticketing.tickets;
+                CREATE POLICY tenant_isolation_policy ON ticketing.tickets
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+                ALTER TABLE ticketing.ticket_comments ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE ticketing.ticket_comments FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON ticketing.ticket_comments;
+                CREATE POLICY tenant_isolation_policy ON ticketing.ticket_comments
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+                ALTER TABLE ticketing.ticket_activity_logs ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE ticketing.ticket_activity_logs FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON ticketing.ticket_activity_logs;
+                CREATE POLICY tenant_isolation_policy ON ticketing.ticket_activity_logs
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+                ALTER TABLE ticketing.ticket_tags ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE ticketing.ticket_tags FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON ticketing.ticket_tags;
+                CREATE POLICY tenant_isolation_policy ON ticketing.ticket_tags
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+                ALTER TABLE ticketing.ticket_sequences ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE ticketing.ticket_sequences FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON ticketing.ticket_sequences;
+                CREATE POLICY tenant_isolation_policy ON ticketing.ticket_sequences
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+                CREATE TABLE IF NOT EXISTS ticketing."__EFMigrationsHistory" (
+                    "MigrationId" varchar(150) PRIMARY KEY,
+                    "ProductVersion" varchar(32) NOT NULL
+                );
+
+                INSERT INTO ticketing."__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+                VALUES ('20261112000000_InitialTicketingSchema', '9.0.2')
+                ON CONFLICT ("MigrationId") DO NOTHING;
                 """;
 
             await using var initCmd = new NpgsqlCommand(initScript, dedicatedConn);

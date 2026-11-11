@@ -14,7 +14,8 @@ using NexusDesk.Modules.KnowledgeBase.Domain;
 using NexusDesk.Modules.Tenants;
 using NexusDesk.Modules.Tenants.Domain;
 using NexusDesk.Modules.Ticketing;
-using NexusDesk.Modules.Ticketing.Domain;
+using NexusDesk.Modules.Ticketing.Domain.Entities;
+using NexusDesk.Modules.Ticketing.Domain.Enums;
 using NexusDesk.SharedKernel.Modules;
 using NexusDesk.SharedKernel.Primitives;
 using NexusDesk.SharedKernel.Time;
@@ -59,7 +60,9 @@ public class TenantScopedTests
         var user = new User(Guid.NewGuid(), tenantId, "user@test.com", "User Name", "Agent");
         user.TenantId.Should().Be(tenantId);
 
-        var ticket = new Ticket(Guid.NewGuid(), tenantId, "ND-1", "Subject", "Desc", "High", Guid.NewGuid());
+        var ticketResult = Ticket.Create(tenantId, "TICK-1001", "Subject", "Desc", TicketPriority.High, TicketChannel.WebPortal, Guid.NewGuid());
+        ticketResult.IsSuccess.Should().BeTrue();
+        var ticket = ticketResult.Value;
         ticket.TenantId.Should().Be(tenantId);
 
         var membership = new TenantMembership(Guid.NewGuid(), tenantId, user.Id, "Admin");

@@ -16,6 +16,7 @@ using NexusDesk.Modules.Tenants.Endpoints;
 using NexusDesk.Modules.Tenants.Middleware;
 using NexusDesk.Modules.Tenants.Persistence;
 using NexusDesk.Modules.Ticketing;
+using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
 using NexusDesk.ServiceDefaults;
 using NexusDesk.SharedKernel.Modules;
 using StackExchange.Redis;
@@ -137,6 +138,12 @@ using (var scope = app.Services.CreateScope())
     {
         await identityInitializer.InitializeAsync();
     }
+
+    var ticketingInitializer = scope.ServiceProvider.GetService<ITicketingSchemaInitializer>();
+    if (ticketingInitializer != null)
+    {
+        await ticketingInitializer.InitializeAsync();
+    }
 }
 
 // Configure Middleware Pipeline
@@ -163,6 +170,9 @@ app.MapIdentityEndpoints();
 
 // Tenant Management & Verification REST APIs
 app.MapTenantEndpoints();
+
+// Core Ticketing Engine & State Machine REST APIs
+app.UseTicketingModule();
 
 // Metadata & Diagnostic Endpoint
 app.MapGet("/api/v1/system/info", async (
