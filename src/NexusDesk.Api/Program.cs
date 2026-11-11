@@ -1,11 +1,15 @@
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
 using NexusDesk.Api.Infrastructure;
 using NexusDesk.Modules.Automation;
 using NexusDesk.Modules.Billing;
 using NexusDesk.Modules.Chat;
 using NexusDesk.Modules.Identity;
+using NexusDesk.Modules.Identity.Authorization;
+using NexusDesk.Modules.Identity.Endpoints;
+using NexusDesk.Modules.Identity.Persistence;
 using NexusDesk.Modules.KnowledgeBase;
 using NexusDesk.Modules.Tenants;
 using NexusDesk.Modules.Tenants.Endpoints;
@@ -25,16 +29,39 @@ builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// 3. OpenAPI / Swagger
+// 3. OpenAPI / Swagger with JWT Bearer Security & Tenant Header Inputs
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "NexusDesk API",
         Version = "v1",
         Description = "NexusDesk Multi-Tenant Cloud-Native SaaS Helpdesk Platform"
     });
+
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Description = "Enter your JWT Bearer token as: Bearer {token}",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        Reference = new OpenApiReference
+        {
+            Type = ReferenceType.SecurityScheme,
+            Id = "Bearer"
+        }
+    };
+
+    c.AddSecurityDefinition("Bearer", securityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { securityScheme, Array.Empty<string>() }
+    });
+
+    c.OperationFilter<TenantHeaderSwaggerOperationFilter>();
 });
 
 // 4. Database & Cache Connection Resolution
@@ -96,13 +123,19 @@ foreach (var installer in installers)
 
 var app = builder.Build();
 
-// Run Tenant Schema Initializer
+// Run Tenant & Identity Schema Initializers
 using (var scope = app.Services.CreateScope())
 {
-    var initializer = scope.ServiceProvider.GetService<ITenantSchemaInitializer>();
-    if (initializer != null)
+    var tenantInitializer = scope.ServiceProvider.GetService<ITenantSchemaInitializer>();
+    if (tenantInitializer != null)
     {
-        await initializer.InitializeAsync();
+        await tenantInitializer.InitializeAsync();
+    }
+
+    var identityInitializer = scope.ServiceProvider.GetService<IIdentitySchemaInitializer>();
+    if (identityInitializer != null)
+    {
+        await identityInitializer.InitializeAsync();
     }
 }
 
@@ -119,8 +152,14 @@ app.UseSwaggerUI(c =>
 // Map Default Health Check Endpoints (/health/live, /health/ready)
 app.MapDefaultEndpoints();
 
-// Tenant Resolution Middleware
+// Authentication & Tenant Authorization Middleware Pipeline
+app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseMiddleware<TenantClaimMatchMiddleware>();
+app.UseAuthorization();
+
+// Identity & Auth REST APIs
+app.MapIdentityEndpoints();
 
 // Tenant Management & Verification REST APIs
 app.MapTenantEndpoints();

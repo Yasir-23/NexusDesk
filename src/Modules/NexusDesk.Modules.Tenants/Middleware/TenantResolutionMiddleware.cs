@@ -149,6 +149,7 @@ public sealed class TenantResolutionMiddleware
             Instance = context.Request.Path
         };
         problemDetails.Extensions["errorCode"] = errorCode;
+        problemDetails.Extensions["code"] = errorCode;
 
         await context.Response.WriteAsJsonAsync(problemDetails);
     }

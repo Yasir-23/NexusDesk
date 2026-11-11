@@ -105,10 +105,47 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void IdentityEntities_MustImplementITenantScoped_WithGuidTenantId()
+    {
+        var identityAssembly = typeof(Modules.Identity.IdentityModuleInstaller).Assembly;
+        var identityEntities = identityAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract &&
+                        t.Namespace != null && t.Namespace.EndsWith(".Domain") &&
+                        !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false))
+            .ToList();
+
+        identityEntities.Should().NotBeEmpty();
+
+        foreach (var type in identityEntities.Where(t => typeof(ITenantScoped).IsAssignableFrom(t)))
+        {
+            var prop = type.GetProperty("TenantId");
+            prop.Should().NotBeNull();
+            prop!.PropertyType.Should().Be(typeof(Guid));
+        }
+    }
+
+    [Fact]
     public void Codebase_MustNotContain_UnapprovedIgnoreQueryFiltersCalls()
     {
         // Scan all .cs files in src/
-        var solutionRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        string solutionRoot;
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "NexusDesk.sln")))
+        {
+            dir = dir.Parent;
+        }
+        if (dir != null)
+        {
+            solutionRoot = dir.FullName;
+        }
+        else if (Directory.Exists(@"D:\dotnet\NexusDesk"))
+        {
+            solutionRoot = @"D:\dotnet\NexusDesk";
+        }
+        else
+        {
+            solutionRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        }
         var srcDir = Path.Combine(solutionRoot, "src");
 
         var csFiles = Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories)

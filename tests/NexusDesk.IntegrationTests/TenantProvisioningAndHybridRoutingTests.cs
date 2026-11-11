@@ -9,6 +9,7 @@ using Xunit;
 
 namespace NexusDesk.IntegrationTests;
 
+[Collection("DatabaseIntegrationCollection")]
 public class TenantProvisioningAndHybridRoutingTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -80,7 +81,7 @@ public class TenantProvisioningAndHybridRoutingTests : IClassFixture<WebApplicat
         globexJson.GetProperty("tenantContext").GetProperty("planTier").GetString().Should().Be("Enterprise");
 
         // 7. Test Suspended Tenant Gate on Beta
-        var adminClient = _factory.CreateClient();
+        var adminClient = AuthTestTokenHelper.CreateSuperAdminClient(_factory);
         var adminListRes = await adminClient.GetAsync("/api/v1/admin/tenants");
         adminListRes.StatusCode.Should().Be(HttpStatusCode.OK);
         var adminListDoc = await adminListRes.Content.ReadFromJsonAsync<JsonElement>();
@@ -89,33 +90,40 @@ public class TenantProvisioningAndHybridRoutingTests : IClassFixture<WebApplicat
         var betaTenantId = Guid.Parse(betaItem.GetProperty("id").GetString()!);
 
         // Ensure Beta is Active before testing suspension
-        await adminClient.PatchAsJsonAsync($"/api/v1/admin/tenants/{betaTenantId}/status", new UpdateTenantStatusRequest("Active", "Reset state"));
+        var resetRes = await adminClient.PatchAsJsonAsync($"/api/v1/admin/tenants/{betaTenantId}/status", new UpdateTenantStatusRequest("Active", "Reset state"));
+        resetRes.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var betaClient = _factory.CreateClient();
         betaClient.DefaultRequestHeaders.Add("X-Tenant-Subdomain", "beta");
-        var betaCurrentPre = await betaClient.GetAsync("/api/v1/tenant/current");
-        betaCurrentPre.StatusCode.Should().Be(HttpStatusCode.OK);
-        var suspendRes = await adminClient.PatchAsJsonAsync($"/api/v1/admin/tenants/{betaTenantId}/status", new UpdateTenantStatusRequest("Suspended", "Non-payment"));
-        suspendRes.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Calling operational route on suspended tenant must return 403 Forbidden with TENANT_SUSPENDED
-        var betaSuspendedRes = await betaClient.GetAsync("/api/v1/tenant/current");
-        betaSuspendedRes.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        var suspendedProblem = await betaSuspendedRes.Content.ReadFromJsonAsync<JsonElement>();
-        string? errorCode = null;
-        if (suspendedProblem.TryGetProperty("errorCode", out var ec))
+        try
         {
-            errorCode = ec.GetString();
-        }
-        else if (suspendedProblem.TryGetProperty("extensions", out var ext) && ext.TryGetProperty("errorCode", out var ec2))
-        {
-            errorCode = ec2.GetString();
-        }
-        errorCode.Should().Be("TENANT_SUSPENDED");
+            var betaCurrentPre = await betaClient.GetAsync("/api/v1/tenant/current");
+            betaCurrentPre.StatusCode.Should().Be(HttpStatusCode.OK);
+            var suspendRes = await adminClient.PatchAsJsonAsync($"/api/v1/admin/tenants/{betaTenantId}/status", new UpdateTenantStatusRequest("Suspended", "Non-payment"));
+            suspendRes.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Reactivate Beta
-        var reactivateRes = await adminClient.PatchAsJsonAsync($"/api/v1/admin/tenants/{betaTenantId}/status", new UpdateTenantStatusRequest("Active", "Payment received"));
-        reactivateRes.StatusCode.Should().Be(HttpStatusCode.OK);
+            // Calling operational route on suspended tenant must return 403 Forbidden with TENANT_SUSPENDED
+            var betaSuspendedRes = await betaClient.GetAsync("/api/v1/tenant/current");
+            betaSuspendedRes.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            var suspendedProblem = await betaSuspendedRes.Content.ReadFromJsonAsync<JsonElement>();
+            string? errorCode = null;
+            if (suspendedProblem.TryGetProperty("errorCode", out var ec))
+            {
+                errorCode = ec.GetString();
+            }
+            else if (suspendedProblem.TryGetProperty("extensions", out var ext) && ext.TryGetProperty("errorCode", out var ec2))
+            {
+                errorCode = ec2.GetString();
+            }
+            errorCode.Should().Be("TENANT_SUSPENDED");
+        }
+        finally
+        {
+            // Reactivate Beta unconditionally
+            var reactivateRes = await adminClient.PatchAsJsonAsync($"/api/v1/admin/tenants/{betaTenantId}/status", new UpdateTenantStatusRequest("Active", "Payment received"));
+            reactivateRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
 
         // Calling operational route on reactivated tenant must succeed
         var betaReactivatedRes = await betaClient.GetAsync("/api/v1/tenant/current");

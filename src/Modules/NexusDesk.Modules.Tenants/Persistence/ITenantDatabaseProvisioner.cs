@@ -86,7 +86,101 @@ public sealed class TenantDatabaseProvisioner : ITenantDatabaseProvisioner
                 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
                 CREATE SCHEMA IF NOT EXISTS tenants;
+                CREATE SCHEMA IF NOT EXISTS identity;
                 CREATE SCHEMA IF NOT EXISTS app;
+
+                CREATE TABLE IF NOT EXISTS identity.users (
+                    id uuid PRIMARY KEY,
+                    tenant_id uuid NOT NULL,
+                    email varchar(256) NOT NULL,
+                    normalized_email varchar(256) NOT NULL,
+                    password_hash text NOT NULL,
+                    full_name varchar(150) NOT NULL,
+                    encrypted_phone_number text NULL,
+                    sso_provider varchar(50) NULL,
+                    sso_subject_id varchar(200) NULL,
+                    role varchar(30) NOT NULL,
+                    is_active boolean NOT NULL DEFAULT true,
+                    is_anonymized boolean NOT NULL DEFAULT false,
+                    last_login_at_utc timestamptz NULL,
+                    created_at_utc timestamptz NOT NULL DEFAULT now(),
+                    updated_at_utc timestamptz NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_users_tenant_id ON identity.users (tenant_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_users_tenant_email ON identity.users (tenant_id, normalized_email);
+
+                CREATE TABLE IF NOT EXISTS identity.user_role_assignments (
+                    id uuid PRIMARY KEY,
+                    user_id uuid NOT NULL,
+                    tenant_id uuid NOT NULL,
+                    role varchar(30) NOT NULL,
+                    created_at_utc timestamptz NOT NULL DEFAULT now()
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_user_roles_tenant_id ON identity.user_role_assignments (tenant_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_user_roles_user_role ON identity.user_role_assignments (user_id, role);
+
+                CREATE TABLE IF NOT EXISTS identity.refresh_tokens (
+                    id uuid PRIMARY KEY,
+                    user_id uuid NOT NULL,
+                    tenant_id uuid NOT NULL,
+                    token_hash varchar(128) NOT NULL,
+                    jwt_id varchar(64) NOT NULL,
+                    expires_at_utc timestamptz NOT NULL,
+                    revoked_at_utc timestamptz NULL,
+                    replaced_by_token_hash varchar(128) NULL,
+                    created_at_utc timestamptz NOT NULL DEFAULT now()
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_refresh_tokens_tenant_id ON identity.refresh_tokens (tenant_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash ON identity.refresh_tokens (token_hash);
+
+                CREATE TABLE IF NOT EXISTS identity.oauth_authorization_codes (
+                    id uuid PRIMARY KEY,
+                    code_hash varchar(128) NOT NULL,
+                    user_id uuid NOT NULL,
+                    tenant_id uuid NOT NULL,
+                    client_id varchar(100) NOT NULL,
+                    redirect_uri varchar(500) NOT NULL,
+                    code_challenge varchar(200) NOT NULL,
+                    code_challenge_method varchar(20) NOT NULL,
+                    scope varchar(200) NULL,
+                    expires_at_utc timestamptz NOT NULL,
+                    consumed_at_utc timestamptz NULL,
+                    created_at_utc timestamptz NOT NULL DEFAULT now()
+                );
+
+                CREATE INDEX IF NOT EXISTS ix_oauth_codes_tenant_id ON identity.oauth_authorization_codes (tenant_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_oauth_codes_code_hash ON identity.oauth_authorization_codes (code_hash);
+
+                ALTER TABLE identity.users ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE identity.users FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON identity.users;
+                CREATE POLICY tenant_isolation_policy ON identity.users
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+                ALTER TABLE identity.user_role_assignments ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE identity.user_role_assignments FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON identity.user_role_assignments;
+                CREATE POLICY tenant_isolation_policy ON identity.user_role_assignments
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+                ALTER TABLE identity.refresh_tokens ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE identity.refresh_tokens FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON identity.refresh_tokens;
+                CREATE POLICY tenant_isolation_policy ON identity.refresh_tokens
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid);
+
+                ALTER TABLE identity.oauth_authorization_codes ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE identity.oauth_authorization_codes FORCE ROW LEVEL SECURITY;
+                DROP POLICY IF EXISTS tenant_isolation_policy ON identity.oauth_authorization_codes;
+                CREATE POLICY tenant_isolation_policy ON identity.oauth_authorization_codes
+                    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid)
+                    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid OR tenant_id = '00000000-0000-0000-0000-000000000000'::uuid);
 
                 CREATE TABLE IF NOT EXISTS tenants.tenant_memberships (
                     id uuid PRIMARY KEY,

@@ -7,6 +7,7 @@ using Xunit;
 
 namespace NexusDesk.IntegrationTests;
 
+[Collection("DatabaseIntegrationCollection")]
 public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -135,5 +136,27 @@ public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("NexusDesk API");
+        content.Should().Contain("Bearer");
+        content.Should().Contain("X-Tenant-Subdomain");
+
+        using var doc = JsonDocument.Parse(content);
+        var paths = doc.RootElement.GetProperty("paths");
+
+        var authorizePost = paths.GetProperty("/connect/authorize").GetProperty("post");
+        authorizePost.GetProperty("requestBody").GetProperty("content")
+            .TryGetProperty("application/json", out _).Should().BeTrue();
+
+        var tokenPost = paths.GetProperty("/connect/token").GetProperty("post");
+        tokenPost.GetProperty("requestBody").GetProperty("content")
+            .TryGetProperty("application/json", out _).Should().BeTrue();
+
+        var ssoPost = paths.GetProperty("/connect/sso/{provider}").GetProperty("post");
+        ssoPost.GetProperty("requestBody").GetProperty("content")
+            .TryGetProperty("application/json", out _).Should().BeTrue();
+
+        var schemas = doc.RootElement.GetProperty("components").GetProperty("schemas");
+        schemas.TryGetProperty("AuthorizeRequestModel", out _).Should().BeTrue();
+        schemas.TryGetProperty("TokenRequestModel", out _).Should().BeTrue();
+        schemas.TryGetProperty("SsoRequestModel", out _).Should().BeTrue();
     }
 }

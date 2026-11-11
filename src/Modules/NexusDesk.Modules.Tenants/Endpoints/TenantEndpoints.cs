@@ -18,7 +18,8 @@ public record ProvisionTenantRequest(
     string Subdomain,
     string AdminEmail,
     string AdminFullName,
-    string PlanTier);
+    string PlanTier,
+    string? AdminPassword = null);
 
 public record PlanLimitsDto(int MaxAgents, int MaxTicketsPerMonth, long MaxStorageBytes);
 
@@ -140,6 +141,11 @@ public static class TenantEndpoints
                 "SystemDefault",
                 now);
 
+            var adminPassword = string.IsNullOrWhiteSpace(request.AdminPassword) ? "Password123!" : request.AdminPassword;
+            var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<string>();
+            var adminPasswordHash = hasher.HashPassword(request.AdminEmail, adminPassword);
+            var normalizedAdminEmail = request.AdminEmail.Trim().ToUpperInvariant();
+
             if (isolationStrategy == IsolationStrategy.DedicatedDatabase && dedicatedRawConn != null)
             {
                 await using var dedicatedConn = new NpgsqlConnection(dedicatedRawConn);
@@ -158,6 +164,30 @@ public static class TenantEndpoints
                 cmdM.Parameters.AddWithValue("fullName", initialMembership.FullName);
                 cmdM.Parameters.AddWithValue("createdAtUtc", initialMembership.CreatedAtUtc);
                 await cmdM.ExecuteNonQueryAsync(httpContext.RequestAborted);
+
+                var insertUserSql = """
+                    INSERT INTO identity.users (
+                        id, tenant_id, email, normalized_email, password_hash, full_name,
+                        role, is_active, is_anonymized, created_at_utc
+                    ) VALUES (
+                        @id, @tenantId, @email, @normalizedEmail, @passwordHash, @fullName,
+                        'TenantAdmin', true, false, @createdAtUtc
+                    ) ON CONFLICT (tenant_id, normalized_email) DO NOTHING;
+
+                    INSERT INTO identity.user_role_assignments (id, user_id, tenant_id, role, created_at_utc)
+                    VALUES (@roleId, @id, @tenantId, 'TenantAdmin', @createdAtUtc)
+                    ON CONFLICT (user_id, role) DO NOTHING;
+                    """;
+                await using var cmdU = new NpgsqlCommand(insertUserSql, dedicatedConn);
+                cmdU.Parameters.AddWithValue("id", initialMembership.UserId);
+                cmdU.Parameters.AddWithValue("tenantId", tenant.Id);
+                cmdU.Parameters.AddWithValue("email", request.AdminEmail);
+                cmdU.Parameters.AddWithValue("normalizedEmail", normalizedAdminEmail);
+                cmdU.Parameters.AddWithValue("passwordHash", adminPasswordHash);
+                cmdU.Parameters.AddWithValue("fullName", request.AdminFullName);
+                cmdU.Parameters.AddWithValue("createdAtUtc", initialMembership.CreatedAtUtc);
+                cmdU.Parameters.AddWithValue("roleId", Guid.NewGuid());
+                await cmdU.ExecuteNonQueryAsync(httpContext.RequestAborted);
 
                 var insertSettingSql = """
                     INSERT INTO tenants.tenant_settings (id, tenant_id, key, value, created_at_utc)
@@ -198,6 +228,30 @@ public static class TenantEndpoints
                 cmdM.Parameters.AddWithValue("fullName", initialMembership.FullName);
                 cmdM.Parameters.AddWithValue("createdAtUtc", initialMembership.CreatedAtUtc);
                 await cmdM.ExecuteNonQueryAsync(httpContext.RequestAborted);
+
+                var insertUserSql = """
+                    INSERT INTO identity.users (
+                        id, tenant_id, email, normalized_email, password_hash, full_name,
+                        role, is_active, is_anonymized, created_at_utc
+                    ) VALUES (
+                        @id, @tenantId, @email, @normalizedEmail, @passwordHash, @fullName,
+                        'TenantAdmin', true, false, @createdAtUtc
+                    ) ON CONFLICT (tenant_id, normalized_email) DO NOTHING;
+
+                    INSERT INTO identity.user_role_assignments (id, user_id, tenant_id, role, created_at_utc)
+                    VALUES (@roleId, @id, @tenantId, 'TenantAdmin', @createdAtUtc)
+                    ON CONFLICT (user_id, role) DO NOTHING;
+                    """;
+                await using var cmdU = new NpgsqlCommand(insertUserSql, sharedConn);
+                cmdU.Parameters.AddWithValue("id", initialMembership.UserId);
+                cmdU.Parameters.AddWithValue("tenantId", tenant.Id);
+                cmdU.Parameters.AddWithValue("email", request.AdminEmail);
+                cmdU.Parameters.AddWithValue("normalizedEmail", normalizedAdminEmail);
+                cmdU.Parameters.AddWithValue("passwordHash", adminPasswordHash);
+                cmdU.Parameters.AddWithValue("fullName", request.AdminFullName);
+                cmdU.Parameters.AddWithValue("createdAtUtc", initialMembership.CreatedAtUtc);
+                cmdU.Parameters.AddWithValue("roleId", Guid.NewGuid());
+                await cmdU.ExecuteNonQueryAsync(httpContext.RequestAborted);
 
                 var insertSettingSql = """
                     INSERT INTO tenants.tenant_settings (id, tenant_id, key, value, created_at_utc)
@@ -269,6 +323,7 @@ public static class TenantEndpoints
                 items
             });
         })
+        .RequireAuthorization("PlatformSuperAdminOnly")
         .WithName("ListTenants")
         .WithTags("PlatformAdmin");
 
@@ -316,6 +371,7 @@ public static class TenantEndpoints
                 auditLogs
             });
         })
+        .RequireAuthorization("PlatformSuperAdminOnly")
         .WithName("GetTenantById")
         .WithTags("PlatformAdmin");
 
@@ -377,6 +433,7 @@ public static class TenantEndpoints
                 tenant.UpdatedAtUtc
             });
         })
+        .RequireAuthorization("PlatformSuperAdminOnly")
         .WithName("UpdateTenantStatus")
         .WithTags("PlatformAdmin");
 
@@ -486,6 +543,7 @@ public static class TenantEndpoints
                 setting.CreatedAtUtc
             });
         })
+        .RequireAuthorization("TenantAdminOrHigher")
         .WithName("CreateTenantSettingItem")
         .WithTags("TenantScoped");
 

@@ -13,6 +13,7 @@ using Xunit;
 
 namespace NexusDesk.IntegrationTests;
 
+[Collection("DatabaseIntegrationCollection")]
 public class TenantLeakProofTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -48,7 +49,7 @@ public class TenantLeakProofTests : IClassFixture<WebApplicationFactory<Program>
             new ProvisionTenantRequest("Globex Global", "globex", "admin@globex.com", "Globex Admin", "Enterprise"));
 
         // Ensure all provisioned tenants are Active
-        var adminClient = _factory.CreateClient();
+        var adminClient = AuthTestTokenHelper.CreateSuperAdminClient(_factory);
         var adminListRes = await adminClient.GetAsync("/api/v1/admin/tenants");
         var adminDoc = await adminListRes.Content.ReadFromJsonAsync<JsonElement>();
         var itemsProp = adminDoc.TryGetProperty("items", out var ip) ? ip : adminDoc.GetProperty("Items");
@@ -77,8 +78,7 @@ public class TenantLeakProofTests : IClassFixture<WebApplicationFactory<Program>
         // 3. Seed 10 distinct private records per tenant
         foreach (var t in tenants)
         {
-            var tClient = _factory.CreateClient();
-            tClient.DefaultRequestHeaders.Add("X-Tenant-Subdomain", t.Subdomain);
+            var tClient = AuthTestTokenHelper.CreateTenantAdminClient(_factory, t.Id, t.Subdomain);
 
             for (var i = 0; i < 10; i++)
             {
