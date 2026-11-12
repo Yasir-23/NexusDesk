@@ -6,7 +6,11 @@ namespace NexusDesk.Modules.Ticketing.Domain.Events;
 public sealed record TicketCreatedDomainEvent(
     Guid TicketId,
     Guid TenantId,
-    string TicketNumber) : DomainEvent;
+    string TicketNumber,
+    string? Title = null,
+    string? Priority = null,
+    Guid? CustomerId = null,
+    DateTimeOffset? CreatedAtUtc = null) : DomainEvent;
 
 public sealed record TicketAssignedDomainEvent(
     Guid TicketId,
@@ -40,3 +44,11 @@ public sealed record TicketSlaBreachedDomainEvent(
     string Priority,
     string BreachType,
     DateTimeOffset BreachedAtUtc) : DomainEvent;
+
+public sealed record TicketResolvedDomainEvent(
+    Guid TicketId,
+    Guid TenantId,
+    string TicketNumber,
+    Guid ResolvedByAgentId,
+    string ResolutionSummary,
+    DateTimeOffset ResolvedAtUtc) : DomainEvent;

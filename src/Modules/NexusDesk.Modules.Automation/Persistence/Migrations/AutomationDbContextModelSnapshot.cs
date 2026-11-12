@@ -57,6 +57,63 @@ namespace NexusDesk.Modules.Automation.Persistence.Migrations
                     b.HasIndex("TenantId", "Priority").IsUnique().HasDatabaseName("ix_sla_policies_tenant_priority");
                     b.ToTable("sla_policies", "automation");
                 });
+
+            modelBuilder.Entity("NexusDesk.Modules.Automation.Domain.WebhookSubscription", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid").HasColumnName("tenant_id");
+                    b.Property<string>("TargetUrl").IsRequired().HasMaxLength(2048).HasColumnType("character varying(2048)").HasColumnName("target_url");
+                    b.Property<string>("EncryptedSecret").IsRequired().HasColumnType("text").HasColumnName("encrypted_secret");
+                    b.Property<string>("EventTypes").IsRequired().HasColumnType("jsonb").HasColumnName("event_types");
+                    b.Property<bool>("IsActive").HasColumnType("boolean").HasColumnName("is_active");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone").HasColumnName("created_at_utc");
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("timestamp with time zone").HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId").HasDatabaseName("ix_webhook_subscriptions_tenant_id");
+                    b.HasIndex("TenantId", "IsActive").HasDatabaseName("ix_webhook_subscriptions_tenant_active");
+                    b.ToTable("webhook_subscriptions", "automation");
+                });
+
+            modelBuilder.Entity("NexusDesk.Modules.Automation.Domain.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid").HasColumnName("tenant_id");
+                    b.Property<string>("EventType").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)").HasColumnName("event_type");
+                    b.Property<string>("PayloadJson").IsRequired().HasColumnType("jsonb").HasColumnName("payload_json");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(30).HasColumnType("character varying(30)").HasColumnName("status");
+                    b.Property<int>("RetryCount").HasColumnType("integer").HasDefaultValue(0).HasColumnName("retry_count");
+                    b.Property<DateTimeOffset>("NextRetryAtUtc").HasColumnType("timestamp with time zone").HasColumnName("next_retry_at_utc");
+                    b.Property<string>("LastError").HasColumnType("text").HasColumnName("last_error");
+                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("timestamp with time zone").HasColumnName("created_at_utc");
+                    b.Property<DateTimeOffset?>("ProcessedAtUtc").HasColumnType("timestamp with time zone").HasColumnName("processed_at_utc");
+
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId").HasDatabaseName("ix_outbox_messages_tenant_id");
+                    b.HasIndex("TenantId", "Status", "NextRetryAtUtc").HasDatabaseName("ix_outbox_messages_tenant_status_retry");
+                    b.HasIndex("Status", "NextRetryAtUtc").HasDatabaseName("ix_outbox_messages_status_retry");
+                    b.ToTable("outbox_messages", "automation");
+                });
+
+            modelBuilder.Entity("NexusDesk.Modules.Automation.Domain.DeadLetterWebhook", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uuid").HasColumnName("id");
+                    b.Property<Guid>("TenantId").HasColumnType("uuid").HasColumnName("tenant_id");
+                    b.Property<Guid>("OutboxMessageId").HasColumnType("uuid").HasColumnName("outbox_message_id");
+                    b.Property<Guid>("WebhookSubscriptionId").HasColumnType("uuid").HasColumnName("webhook_subscription_id");
+                    b.Property<string>("TargetUrl").IsRequired().HasMaxLength(2048).HasColumnType("character varying(2048)").HasColumnName("target_url");
+                    b.Property<string>("EventType").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)").HasColumnName("event_type");
+                    b.Property<string>("PayloadJson").IsRequired().HasColumnType("jsonb").HasColumnName("payload_json");
+                    b.Property<int>("AttemptCount").HasColumnType("integer").HasColumnName("attempt_count");
+                    b.Property<int?>("LastHttpStatusCode").HasColumnType("integer").HasColumnName("last_http_status_code");
+                    b.Property<string>("LastError").IsRequired().HasColumnType("text").HasColumnName("last_error");
+                    b.Property<DateTimeOffset>("FailedAtUtc").HasColumnType("timestamp with time zone").HasColumnName("failed_at_utc");
+
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId").HasDatabaseName("ix_dead_letter_webhooks_tenant_id");
+                    b.HasIndex("OutboxMessageId").HasDatabaseName("ix_dead_letter_webhooks_outbox_message_id");
+                    b.ToTable("dead_letter_webhooks", "automation");
+                });
 #pragma warning restore 612, 618
         }
     }

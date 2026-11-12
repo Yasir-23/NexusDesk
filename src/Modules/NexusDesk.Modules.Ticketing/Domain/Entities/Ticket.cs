@@ -165,7 +165,7 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
         }
 
         ticket.RecordActivity(customerId, "Created", null, normalizedNumber, now);
-        ticket.AddDomainEvent(new TicketCreatedDomainEvent(ticketId, tenantId, normalizedNumber));
+        ticket.AddDomainEvent(new TicketCreatedDomainEvent(ticketId, tenantId, normalizedNumber, title, priority.ToString(), customerId, now));
 
         return Result.Success(ticket);
     }
@@ -414,6 +414,7 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
         ResolutionNotes = resolutionNotes.Trim();
         ResolvedAtUtc = now;
         TransitionStatusInternal(TicketStatus.Resolved, resolvedByUserId, now);
+        AddDomainEvent(new TicketResolvedDomainEvent(Id, TenantId, TicketNumber, resolvedByUserId, ResolutionNotes, now));
         UpdatedAtUtc = now;
 
         return Result.Success();

@@ -10,6 +10,7 @@ using NexusDesk.Modules.Tenants.Persistence.Interceptors;
 using NexusDesk.SharedKernel.Automation;
 using NexusDesk.SharedKernel.Modules;
 using NexusDesk.SharedKernel.MultiTenancy;
+using NexusDesk.SharedKernel.Outbox;
 
 namespace NexusDesk.Modules.Automation;
 
@@ -47,9 +48,21 @@ public static class AutomationModuleExtensions
 
         services.AddScoped<ISlaPolicyProvider, SlaPolicyProvider>();
         services.AddScoped<IAutomationRuleEngine, AutomationRuleEvaluator>();
+        services.AddScoped<IOutboxEventEnqueuer, OutboxEventEnqueuer>();
+
+#pragma warning disable EXTEXP0001
+        services.AddHttpClient(OutboxWebhookDispatcherBackgroundService.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(5);
+        })
+        .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
 
         services.AddSingleton<SlaBreachEvaluatorBackgroundService>();
         services.AddHostedService(sp => sp.GetRequiredService<SlaBreachEvaluatorBackgroundService>());
+
+        services.AddSingleton<OutboxWebhookDispatcherBackgroundService>();
+        services.AddHostedService(sp => sp.GetRequiredService<OutboxWebhookDispatcherBackgroundService>());
 
         return services;
     }

@@ -6,6 +6,7 @@ using NexusDesk.Modules.Tenants.Persistence;
 using NexusDesk.Modules.Tenants.Persistence.Interceptors;
 using NexusDesk.Modules.Ticketing.Application.Automation;
 using NexusDesk.Modules.Ticketing.Application.Commands;
+using NexusDesk.Modules.Ticketing.Application.Outbox;
 using NexusDesk.Modules.Ticketing.Application.Queries;
 using NexusDesk.Modules.Ticketing.Domain.Events;
 using NexusDesk.Modules.Ticketing.Endpoints;
@@ -78,6 +79,11 @@ public static class TicketingModuleExtensions
         services.AddScoped<IDomainEventHandler<TicketCreatedDomainEvent>, TicketingAutomationEventBridge>();
         services.AddScoped<IDomainEventHandler<TicketPriorityChangedDomainEvent>, TicketingAutomationEventBridge>();
         services.AddScoped<IDomainEventHandler<TicketSlaBreachedDomainEvent>, TicketingAutomationEventBridge>();
+
+        // Outbound Webhook Transactional Outbox Event Bridge
+        services.AddScoped<IDomainEventHandler<TicketCreatedDomainEvent>, TicketingOutboxIntegrationEventBridge>();
+        services.AddScoped<IDomainEventHandler<TicketSlaBreachedDomainEvent>, TicketingOutboxIntegrationEventBridge>();
+        services.AddScoped<IDomainEventHandler<TicketResolvedDomainEvent>, TicketingOutboxIntegrationEventBridge>();
 
         return services;
     }

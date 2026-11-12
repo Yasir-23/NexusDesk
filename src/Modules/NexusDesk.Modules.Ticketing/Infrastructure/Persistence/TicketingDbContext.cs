@@ -37,19 +37,43 @@ public class TicketingDbContext : DbContext
             .SelectMany(a => a.DomainEvents)
             .ToList();
 
-        var result = await base.SaveChangesAsync(cancellationToken);
-
-        foreach (var aggregateRoot in aggregateRoots)
+        if (Database.CurrentTransaction != null)
         {
-            aggregateRoot.ClearDomainEvents();
+            var result = await base.SaveChangesAsync(cancellationToken);
+
+            foreach (var aggregateRoot in aggregateRoots)
+            {
+                aggregateRoot.ClearDomainEvents();
+            }
+
+            if (pendingEvents.Count > 0 && _domainEventDispatcher != null)
+            {
+                await _domainEventDispatcher.DispatchAsync(pendingEvents, cancellationToken);
+            }
+
+            return result;
         }
 
-        if (pendingEvents.Count > 0 && _domainEventDispatcher != null)
+        var strategy = Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            await _domainEventDispatcher.DispatchAsync(pendingEvents, cancellationToken);
-        }
+            await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
 
-        return result;
+            var result = await base.SaveChangesAsync(cancellationToken);
+
+            foreach (var aggregateRoot in aggregateRoots)
+            {
+                aggregateRoot.ClearDomainEvents();
+            }
+
+            if (pendingEvents.Count > 0 && _domainEventDispatcher != null)
+            {
+                await _domainEventDispatcher.DispatchAsync(pendingEvents, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

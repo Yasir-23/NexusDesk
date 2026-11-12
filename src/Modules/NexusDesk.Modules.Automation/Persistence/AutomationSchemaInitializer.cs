@@ -68,6 +68,43 @@ public sealed class AutomationSchemaInitializer : IAutomationSchemaInitializer
 
         await using var dbContext = new AutomationDbContext(optionsBuilder.Options, _tenantContextAccessor);
         await dbContext.Database.MigrateAsync(cancellationToken);
+        await EnsureRlsPoliciesAsync(dbContext, cancellationToken);
+    }
+
+    private static async Task EnsureRlsPoliciesAsync(AutomationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        const string rlsSql = """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'automation' AND table_name = 'webhook_subscriptions') THEN
+                    ALTER TABLE automation.webhook_subscriptions ENABLE ROW LEVEL SECURITY;
+                    ALTER TABLE automation.webhook_subscriptions FORCE ROW LEVEL SECURITY;
+                    DROP POLICY IF EXISTS tenant_isolation_policy ON automation.webhook_subscriptions;
+                    CREATE POLICY tenant_isolation_policy ON automation.webhook_subscriptions
+                        USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                        WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+                END IF;
+
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'automation' AND table_name = 'outbox_messages') THEN
+                    ALTER TABLE automation.outbox_messages ENABLE ROW LEVEL SECURITY;
+                    ALTER TABLE automation.outbox_messages FORCE ROW LEVEL SECURITY;
+                    DROP POLICY IF EXISTS tenant_isolation_policy ON automation.outbox_messages;
+                    CREATE POLICY tenant_isolation_policy ON automation.outbox_messages
+                        USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                        WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+                END IF;
+
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'automation' AND table_name = 'dead_letter_webhooks') THEN
+                    ALTER TABLE automation.dead_letter_webhooks ENABLE ROW LEVEL SECURITY;
+                    ALTER TABLE automation.dead_letter_webhooks FORCE ROW LEVEL SECURITY;
+                    DROP POLICY IF EXISTS tenant_isolation_policy ON automation.dead_letter_webhooks;
+                    CREATE POLICY tenant_isolation_policy ON automation.dead_letter_webhooks
+                        USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                        WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+                END IF;
+            END $$;
+            """;
+        await dbContext.Database.ExecuteSqlRawAsync(rlsSql, cancellationToken);
     }
 
     private async Task MigrateDedicatedTenantDatabasesAsync(NpgsqlConnection defaultConn, CancellationToken cancellationToken)
