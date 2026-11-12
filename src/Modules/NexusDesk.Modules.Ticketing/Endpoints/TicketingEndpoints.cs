@@ -3,12 +3,15 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using NexusDesk.Modules.Identity.Authorization;
 using NexusDesk.Modules.Identity.Domain;
 using NexusDesk.Modules.Ticketing.Application.Commands;
 using NexusDesk.Modules.Ticketing.Application.Contracts;
 using NexusDesk.Modules.Ticketing.Application.Queries;
 using NexusDesk.Modules.Ticketing.Domain.Enums;
+using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
+using NexusDesk.Modules.Ticketing.RealTime;
 using NexusDesk.SharedKernel.MultiTenancy;
 using NexusDesk.SharedKernel.Primitives;
 
@@ -331,6 +334,49 @@ public static class TicketingEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict)
         .WithName("AddTicketComment");
+
+        // 8. GET /api/v1/tickets/{id}/presence — Active staff viewers and typing indicators
+        group.MapGet("/{id:guid}/presence", async (
+            Guid id,
+            TicketingDbContext ticketingDb,
+            ITicketPresenceTracker presenceTracker,
+            ITenantContextAccessor tenantContextAccessor,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (!TryEnsureTenantResolved(tenantContextAccessor, httpContext, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var tenantId = tenantContextAccessor.TenantContext!.TenantId!.Value;
+            var exists = await ticketingDb.Tickets
+                .AsNoTracking()
+                .AnyAsync(t => t.Id == id && t.TenantId == tenantId, cancellationToken);
+
+            if (!exists)
+            {
+                return CreateProblemResult(
+                    StatusCodes.Status404NotFound,
+                    "Resource Not Found",
+                    $"Ticket '{id}' was not found.",
+                    "Ticket.NotFound",
+                    httpContext);
+            }
+
+            var activeAgents = presenceTracker.GetActiveAgents(tenantId, id);
+            return Results.Ok(new TicketPresenceResponse(
+                id,
+                tenantId,
+                activeAgents,
+                DateTimeOffset.UtcNow));
+        })
+        .RequireAuthorization(IdentityPolicies.AgentOrHigher)
+        .Produces<TicketPresenceResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .WithName("GetTicketPresence");
 
         return app;
     }

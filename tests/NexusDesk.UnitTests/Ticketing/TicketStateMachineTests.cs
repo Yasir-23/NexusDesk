@@ -268,4 +268,31 @@ public class TicketStateMachineTests
         ticket.MoveToPendingCustomer(AgentId).IsFailure.Should().BeTrue();
         ticket.MoveToPendingInternal(AgentId).IsFailure.Should().BeTrue();
     }
+
+    [Fact]
+    public void ChangePriority_WhenChanged_ShouldRaiseTicketPriorityChangedDomainEvent()
+    {
+        var ticket = CreateValidTicket(TicketPriority.Medium);
+        ticket.ClearDomainEvents();
+
+        // Same priority should be a no-op without raising an event
+        var sameResult = ticket.ChangePriority(TicketPriority.Medium, AgentId, BaseTime.AddMinutes(5));
+        sameResult.IsSuccess.Should().BeTrue();
+        ticket.DomainEvents.Should().BeEmpty();
+
+        // Different priority should raise TicketPriorityChangedDomainEvent
+        var changeResult = ticket.ChangePriority(TicketPriority.Urgent, AgentId, BaseTime.AddMinutes(10));
+        changeResult.IsSuccess.Should().BeTrue();
+        ticket.Priority.Should().Be(TicketPriority.Urgent);
+
+        var domainEvent = ticket.DomainEvents.Should().ContainSingle(e => e is TicketPriorityChangedDomainEvent)
+            .Which.Should().BeOfType<TicketPriorityChangedDomainEvent>().Subject;
+
+        domainEvent.TicketId.Should().Be(ticket.Id);
+        domainEvent.TenantId.Should().Be(TenantId);
+        domainEvent.TicketNumber.Should().Be(ticket.TicketNumber);
+        domainEvent.OldPriority.Should().Be(TicketPriority.Medium);
+        domainEvent.NewPriority.Should().Be(TicketPriority.Urgent);
+        domainEvent.PerformedByUserId.Should().Be(AgentId);
+    }
 }

@@ -6,10 +6,13 @@ using NexusDesk.Modules.Tenants.Persistence;
 using NexusDesk.Modules.Tenants.Persistence.Interceptors;
 using NexusDesk.Modules.Ticketing.Application.Commands;
 using NexusDesk.Modules.Ticketing.Application.Queries;
+using NexusDesk.Modules.Ticketing.Domain.Events;
 using NexusDesk.Modules.Ticketing.Endpoints;
 using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
+using NexusDesk.Modules.Ticketing.RealTime;
 using NexusDesk.SharedKernel.Modules;
 using NexusDesk.SharedKernel.MultiTenancy;
+using NexusDesk.SharedKernel.Primitives;
 
 namespace NexusDesk.Modules.Ticketing;
 
@@ -56,6 +59,15 @@ public static class TicketingModuleExtensions
         // CQRS Query Handlers
         services.AddScoped<GetTicketByIdQueryHandler>();
         services.AddScoped<GetTicketsPagedQueryHandler>();
+
+        // Real-Time Presence & Domain Event Dispatching
+        services.AddSingleton<ITicketPresenceTracker, InMemoryTicketPresenceTracker>();
+        services.AddScoped<IDomainEventDispatcher, InProcessDomainEventDispatcher>();
+        services.AddScoped<IDomainEventHandler<TicketCreatedDomainEvent>, TicketRealtimeNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<TicketAssignedDomainEvent>, TicketRealtimeNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<TicketStatusChangedDomainEvent>, TicketRealtimeNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<TicketPriorityChangedDomainEvent>, TicketRealtimeNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<TicketCommentAddedDomainEvent>, TicketRealtimeNotificationHandler>();
 
         return services;
     }

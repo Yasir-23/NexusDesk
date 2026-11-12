@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
@@ -17,6 +18,7 @@ using NexusDesk.Modules.Tenants.Middleware;
 using NexusDesk.Modules.Tenants.Persistence;
 using NexusDesk.Modules.Ticketing;
 using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
+using NexusDesk.Modules.Ticketing.RealTime;
 using NexusDesk.ServiceDefaults;
 using NexusDesk.SharedKernel.Modules;
 using StackExchange.Redis;
@@ -86,6 +88,23 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     config.AbortOnConnectFail = false;
     return ConnectionMultiplexer.Connect(config);
 });
+
+// SignalR with JSON Enum Serialization & Optional Redis Backplane
+var signalRBuilder = builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+
+var useRedisBackplane = builder.Configuration.GetValue<bool>("SignalR:UseRedisBackplane");
+if (useRedisBackplane && !string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    signalRBuilder.AddStackExchangeRedis(redisConnectionString, options =>
+    {
+        options.Configuration.ChannelPrefix = RedisChannel.Literal("NexusDesk");
+        options.Configuration.AbortOnConnectFail = false;
+    });
+}
 
 // 5. Readiness Probes (PostgreSQL + vector extension probe & Redis ping)
 builder.Services.AddHealthChecks()
@@ -173,6 +192,9 @@ app.MapTenantEndpoints();
 
 // Core Ticketing Engine & State Machine REST APIs
 app.UseTicketingModule();
+
+// Real-Time SignalR Hubs
+app.MapHub<TicketHub>("/hubs/tickets");
 
 // Metadata & Diagnostic Endpoint
 app.MapGet("/api/v1/system/info", async (

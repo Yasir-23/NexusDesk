@@ -251,6 +251,13 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
 
         RecordActivity(performedByUserId, "PriorityChanged", oldPriority.ToString(), newPriority.ToString(), now);
         UpdatedAtUtc = now;
+        AddDomainEvent(new TicketPriorityChangedDomainEvent(
+            Id,
+            TenantId,
+            TicketNumber,
+            oldPriority,
+            newPriority,
+            performedByUserId));
 
         return Result.Success();
     }

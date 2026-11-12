@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using NexusDesk.Modules.Ticketing.Domain.Entities;
 using NexusDesk.SharedKernel.MultiTenancy;
+using NexusDesk.SharedKernel.Primitives;
 
 namespace NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
 
 public class TicketingDbContext : DbContext
 {
     private readonly ITenantContextAccessor _tenantContextAccessor;
+    private readonly IDomainEventDispatcher? _domainEventDispatcher;
 
     public Guid CurrentTenantId => _tenantContextAccessor.TenantContext?.TenantId ?? Guid.Empty;
 
@@ -17,9 +19,37 @@ public class TicketingDbContext : DbContext
 
     public TicketingDbContext(
         DbContextOptions<TicketingDbContext> options,
-        ITenantContextAccessor tenantContextAccessor) : base(options)
+        ITenantContextAccessor tenantContextAccessor,
+        IDomainEventDispatcher? domainEventDispatcher = null) : base(options)
     {
         _tenantContextAccessor = tenantContextAccessor;
+        _domainEventDispatcher = domainEventDispatcher;
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var aggregateRoots = ChangeTracker.Entries<AggregateRoot<Guid>>()
+            .Where(e => e.Entity.DomainEvents.Count > 0)
+            .Select(e => e.Entity)
+            .ToList();
+
+        var pendingEvents = aggregateRoots
+            .SelectMany(a => a.DomainEvents)
+            .ToList();
+
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        foreach (var aggregateRoot in aggregateRoots)
+        {
+            aggregateRoot.ClearDomainEvents();
+        }
+
+        if (pendingEvents.Count > 0 && _domainEventDispatcher != null)
+        {
+            await _domainEventDispatcher.DispatchAsync(pendingEvents, cancellationToken);
+        }
+
+        return result;
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

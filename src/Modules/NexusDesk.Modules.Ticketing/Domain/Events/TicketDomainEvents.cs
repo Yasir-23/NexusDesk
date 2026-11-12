@@ -24,3 +24,11 @@ public sealed record TicketCommentAddedDomainEvent(
     Guid CommentId,
     CommentType Type,
     bool IsCustomer) : DomainEvent;
+
+public sealed record TicketPriorityChangedDomainEvent(
+    Guid TicketId,
+    Guid TenantId,
+    string TicketNumber,
+    TicketPriority OldPriority,
+    TicketPriority NewPriority,
+    Guid PerformedByUserId) : DomainEvent;
