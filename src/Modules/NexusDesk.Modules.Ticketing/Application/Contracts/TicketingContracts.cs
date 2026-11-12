@@ -46,7 +46,9 @@ public sealed record TicketSummaryResponse(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UpdatedAtUtc,
     uint RowVersion,
-    IReadOnlyList<string> Tags);
+    IReadOnlyList<string> Tags,
+    bool IsSlaBreached = false,
+    DateTimeOffset? SlaBreachedAtUtc = null);
 
 public sealed record TicketCommentDto(
     Guid Id,
@@ -86,7 +88,9 @@ public sealed record TicketDetailsResponse(
     uint RowVersion,
     IReadOnlyList<string> Tags,
     IReadOnlyList<TicketCommentDto> Comments,
-    IReadOnlyList<TicketActivityLogDto> ActivityLogs);
+    IReadOnlyList<TicketActivityLogDto> ActivityLogs,
+    bool IsSlaBreached = false,
+    DateTimeOffset? SlaBreachedAtUtc = null);
 
 public sealed record PagedTicketsResponse(
     IReadOnlyList<TicketSummaryResponse> Items,

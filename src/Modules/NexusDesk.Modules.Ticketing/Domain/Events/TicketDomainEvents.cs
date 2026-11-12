@@ -32,3 +32,11 @@ public sealed record TicketPriorityChangedDomainEvent(
     TicketPriority OldPriority,
     TicketPriority NewPriority,
     Guid PerformedByUserId) : DomainEvent;
+
+public sealed record TicketSlaBreachedDomainEvent(
+    Guid TicketId,
+    Guid TenantId,
+    string TicketNumber,
+    string Priority,
+    string BreachType,
+    DateTimeOffset BreachedAtUtc) : DomainEvent;

@@ -77,6 +77,8 @@ public class TicketingDbContext : DbContext
             b.Property(t => t.FirstResponseDueUtc).HasColumnName("first_response_due_utc");
             b.Property(t => t.ResolutionDueUtc).HasColumnName("resolution_due_utc");
             b.Property(t => t.FirstRespondedAtUtc).HasColumnName("first_responded_at_utc");
+            b.Property(t => t.IsSlaBreached).HasColumnName("is_sla_breached").HasDefaultValue(false).IsRequired();
+            b.Property(t => t.SlaBreachedAtUtc).HasColumnName("sla_breached_at_utc");
             b.Property(t => t.ResolvedAtUtc).HasColumnName("resolved_at_utc");
             b.Property(t => t.ClosedAtUtc).HasColumnName("closed_at_utc");
             b.Property(t => t.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();

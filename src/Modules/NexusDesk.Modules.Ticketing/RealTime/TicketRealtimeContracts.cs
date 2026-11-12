@@ -41,3 +41,10 @@ public sealed record TicketPresenceResponse(
     Guid TenantId,
     IReadOnlyList<TicketPresenceAgentDto> ActiveAgents,
     DateTimeOffset RetrievedAtUtc);
+
+public sealed record SlaBreachAlertNotification(
+    Guid TicketId,
+    string TicketNumber,
+    string Priority,
+    string BreachType,
+    DateTimeOffset BreachedAtUtc);

@@ -3,7 +3,9 @@ using NexusDesk.Modules.Identity.Persistence;
 using NexusDesk.Modules.Ticketing.Application.Contracts;
 using NexusDesk.Modules.Ticketing.Domain.Entities;
 using NexusDesk.Modules.Ticketing.Domain.Enums;
+using NexusDesk.Modules.Ticketing.Domain.ValueObjects;
 using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
+using NexusDesk.SharedKernel.Automation;
 using NexusDesk.SharedKernel.MultiTenancy;
 using NexusDesk.SharedKernel.Primitives;
 
@@ -25,17 +27,20 @@ public sealed class CreateTicketCommandHandler
     private readonly IdentityDbContext _identityDb;
     private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly ITicketNumberGenerator _ticketNumberGenerator;
+    private readonly ISlaPolicyProvider? _slaPolicyProvider;
 
     public CreateTicketCommandHandler(
         TicketingDbContext ticketingDb,
         IdentityDbContext identityDb,
         ITenantContextAccessor tenantContextAccessor,
-        ITicketNumberGenerator ticketNumberGenerator)
+        ITicketNumberGenerator ticketNumberGenerator,
+        ISlaPolicyProvider? slaPolicyProvider = null)
     {
         _ticketingDb = ticketingDb;
         _identityDb = identityDb;
         _tenantContextAccessor = tenantContextAccessor;
         _ticketNumberGenerator = ticketNumberGenerator;
+        _slaPolicyProvider = slaPolicyProvider;
     }
 
     public async Task<Result<TicketDetailsResponse>> HandleAsync(
@@ -88,6 +93,22 @@ public sealed class CreateTicketCommandHandler
             }
         }
 
+        var now = DateTimeOffset.UtcNow;
+        SlaTargets? customSlaTargets = null;
+        if (_slaPolicyProvider != null)
+        {
+            var policyTargets = await _slaPolicyProvider.GetPolicyTargetsAsync(
+                tenantId,
+                command.Priority.ToString(),
+                cancellationToken);
+            if (policyTargets.HasValue)
+            {
+                customSlaTargets = new SlaTargets(
+                    now.AddMinutes(policyTargets.Value.FirstResponseTargetMinutes),
+                    now.AddMinutes(policyTargets.Value.ResolutionTargetMinutes));
+            }
+        }
+
         // Pre-validate ticket invariants before allocating a sequential ticket number
         var preCheck = Ticket.Create(
             tenantId,
@@ -97,7 +118,9 @@ public sealed class CreateTicketCommandHandler
             command.Priority,
             command.Channel,
             effectiveCustomerId,
-            command.Tags);
+            command.Tags,
+            now,
+            customSlaTargets);
 
         if (preCheck.IsFailure)
         {
@@ -118,7 +141,9 @@ public sealed class CreateTicketCommandHandler
                 command.Priority,
                 command.Channel,
                 effectiveCustomerId,
-                command.Tags);
+                command.Tags,
+                now,
+                customSlaTargets);
 
             if (createResult.IsFailure)
             {

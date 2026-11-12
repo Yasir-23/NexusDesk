@@ -12,7 +12,8 @@ public sealed class TicketRealtimeNotificationHandler :
     IDomainEventHandler<TicketAssignedDomainEvent>,
     IDomainEventHandler<TicketStatusChangedDomainEvent>,
     IDomainEventHandler<TicketPriorityChangedDomainEvent>,
-    IDomainEventHandler<TicketCommentAddedDomainEvent>
+    IDomainEventHandler<TicketCommentAddedDomainEvent>,
+    IDomainEventHandler<TicketSlaBreachedDomainEvent>
 {
     private readonly TicketingDbContext _ticketingDb;
     private readonly IHubContext<TicketHub, ITicketHubClient> _hubContext;
@@ -136,6 +137,24 @@ public sealed class TicketRealtimeNotificationHandler :
               ];
 
         await _hubContext.Clients.Groups(groups).TicketCommentAdded(comment);
+    }
+
+    public async Task HandleAsync(TicketSlaBreachedDomainEvent domainEvent, CancellationToken cancellationToken = default)
+    {
+        var alert = new SlaBreachAlertNotification(
+            domainEvent.TicketId,
+            domainEvent.TicketNumber,
+            domainEvent.Priority,
+            domainEvent.BreachType,
+            domainEvent.BreachedAtUtc);
+
+        IReadOnlyList<string> groups =
+        [
+            TicketHubGroups.TenantStaff(domainEvent.TenantId),
+            TicketHubGroups.TicketRoom(domainEvent.TenantId, domainEvent.TicketId)
+        ];
+
+        await _hubContext.Clients.Groups(groups).SlaBreachAlert(alert);
     }
 
     private async Task<TicketRealtimeNotification?> BuildTicketNotificationAsync(

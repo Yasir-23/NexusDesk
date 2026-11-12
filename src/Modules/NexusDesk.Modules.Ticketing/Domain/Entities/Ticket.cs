@@ -26,6 +26,8 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
     public DateTimeOffset? FirstResponseDueUtc { get; private set; }
     public DateTimeOffset? ResolutionDueUtc { get; private set; }
     public DateTimeOffset? FirstRespondedAtUtc { get; private set; }
+    public bool IsSlaBreached { get; private set; }
+    public DateTimeOffset? SlaBreachedAtUtc { get; private set; }
     public DateTimeOffset? ResolvedAtUtc { get; private set; }
     public DateTimeOffset? ClosedAtUtc { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -81,7 +83,8 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
         TicketChannel channel,
         Guid customerId,
         IEnumerable<string>? tags = null,
-        DateTimeOffset? utcNow = null)
+        DateTimeOffset? utcNow = null,
+        SlaTargets? customSlaTargets = null)
     {
         if (tenantId == Guid.Empty)
         {
@@ -127,7 +130,7 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
         }
 
         var now = utcNow ?? DateTimeOffset.UtcNow;
-        var slaTargets = SlaPolicyMatrix.CalculateTargets(priority, now);
+        var slaTargets = customSlaTargets ?? SlaPolicyMatrix.CalculateTargets(priority, now);
         var ticketId = Guid.NewGuid();
         var normalizedNumber = ticketNumber.Trim();
 
@@ -209,7 +212,11 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
     /// <summary>
     /// Changes ticket priority and recalculates SLA targets if they have not yet been breached.
     /// </summary>
-    public Result ChangePriority(TicketPriority newPriority, Guid performedByUserId, DateTimeOffset? utcNow = null)
+    public Result ChangePriority(
+        TicketPriority newPriority,
+        Guid performedByUserId,
+        DateTimeOffset? utcNow = null,
+        SlaTargets? customSlaTargets = null)
     {
         if (!Enum.IsDefined(newPriority))
         {
@@ -237,7 +244,7 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
         var oldPriority = Priority;
         Priority = newPriority;
 
-        var recalculatedTargets = SlaPolicyMatrix.CalculateTargets(newPriority, CreatedAtUtc);
+        var recalculatedTargets = customSlaTargets ?? SlaPolicyMatrix.CalculateTargets(newPriority, CreatedAtUtc);
 
         if (FirstRespondedAtUtc == null && (!FirstResponseDueUtc.HasValue || now <= FirstResponseDueUtc.Value))
         {
@@ -467,6 +474,45 @@ public sealed class Ticket : AggregateRoot<Guid>, ITenantScoped
         TransitionStatusInternal(TicketStatus.Open, reopenedByUserId, now);
         RecordActivity(reopenedByUserId, "Reopened", null, reason.Trim(), now);
         UpdatedAtUtc = now;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Marks the ticket as SLA breached and raises TicketSlaBreachedDomainEvent.
+    /// </summary>
+    public Result MarkSlaBreached(string breachType, DateTimeOffset breachedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(breachType))
+        {
+            return Result.Failure(Error.Validation("Ticket.InvalidBreachType", "Breach type is required."));
+        }
+
+        if (Status is TicketStatus.Resolved or TicketStatus.Closed)
+        {
+            return Result.Failure(Error.Validation(
+                "Ticket.ClosedOrResolvedCannotBreach",
+                "Cannot mark a resolved or closed ticket as SLA breached."));
+        }
+
+        if (IsSlaBreached)
+        {
+            return Result.Success();
+        }
+
+        var normalizedBreachType = breachType.Trim();
+        IsSlaBreached = true;
+        SlaBreachedAtUtc = breachedAtUtc;
+        UpdatedAtUtc = breachedAtUtc;
+
+        RecordActivity(Guid.Empty, "SlaBreached", null, normalizedBreachType, breachedAtUtc);
+        AddDomainEvent(new TicketSlaBreachedDomainEvent(
+            Id,
+            TenantId,
+            TicketNumber,
+            Priority.ToString(),
+            normalizedBreachType,
+            breachedAtUtc));
 
         return Result.Success();
     }

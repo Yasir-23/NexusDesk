@@ -62,6 +62,12 @@ namespace NexusDesk.Modules.Ticketing.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("first_response_due_utc");
 
+                    b.Property<bool>("IsSlaBreached")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_sla_breached");
+
                     b.Property<int>("Priority")
                         .HasColumnType("integer")
                         .HasColumnName("priority");
@@ -83,6 +89,10 @@ namespace NexusDesk.Modules.Ticketing.Infrastructure.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset?>("SlaBreachedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sla_breached_at_utc");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")

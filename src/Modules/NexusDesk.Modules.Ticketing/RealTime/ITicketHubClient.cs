@@ -6,4 +6,5 @@ public interface ITicketHubClient
     Task TicketUpdated(TicketRealtimeNotification payload);
     Task TicketCommentAdded(TicketCommentRealtimeNotification payload);
     Task AgentPresenceUpdated(TicketPresenceNotification payload);
+    Task SlaBreachAlert(SlaBreachAlertNotification payload);
 }

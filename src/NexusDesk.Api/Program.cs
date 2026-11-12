@@ -5,6 +5,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using NexusDesk.Api.Infrastructure;
 using NexusDesk.Modules.Automation;
+using NexusDesk.Modules.Automation.Persistence;
 using NexusDesk.Modules.Billing;
 using NexusDesk.Modules.Chat;
 using NexusDesk.Modules.Identity;
@@ -163,6 +164,12 @@ using (var scope = app.Services.CreateScope())
     {
         await ticketingInitializer.InitializeAsync();
     }
+
+    var automationInitializer = scope.ServiceProvider.GetService<IAutomationSchemaInitializer>();
+    if (automationInitializer != null)
+    {
+        await automationInitializer.InitializeAsync();
+    }
 }
 
 // Configure Middleware Pipeline
@@ -192,6 +199,9 @@ app.MapTenantEndpoints();
 
 // Core Ticketing Engine & State Machine REST APIs
 app.UseTicketingModule();
+
+// SLA Engine & Automation Rules REST APIs
+app.UseAutomationModule();
 
 // Real-Time SignalR Hubs
 app.MapHub<TicketHub>("/hubs/tickets");

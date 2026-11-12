@@ -25,7 +25,9 @@ internal static class TicketingMappingExtensions
             ticket.CreatedAtUtc,
             ticket.UpdatedAtUtc,
             ticket.RowVersion,
-            ticket.Tags.Select(t => t.Name).OrderBy(n => n).ToList());
+            ticket.Tags.Select(t => t.Name).OrderBy(n => n).ToList(),
+            ticket.IsSlaBreached,
+            ticket.SlaBreachedAtUtc);
     }
 
     public static TicketDetailsResponse ToDetailsResponse(this Ticket ticket, bool isCustomer)
@@ -67,7 +69,9 @@ internal static class TicketingMappingExtensions
             ticket.RowVersion,
             ticket.Tags.Select(t => t.Name).OrderBy(n => n).ToList(),
             comments,
-            activityLogs);
+            activityLogs,
+            ticket.IsSlaBreached,
+            ticket.SlaBreachedAtUtc);
     }
 
     public static TicketCommentDto ToDto(this TicketComment comment)

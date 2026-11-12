@@ -4,12 +4,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NexusDesk.Modules.Tenants.Persistence;
 using NexusDesk.Modules.Tenants.Persistence.Interceptors;
+using NexusDesk.Modules.Ticketing.Application.Automation;
 using NexusDesk.Modules.Ticketing.Application.Commands;
 using NexusDesk.Modules.Ticketing.Application.Queries;
 using NexusDesk.Modules.Ticketing.Domain.Events;
 using NexusDesk.Modules.Ticketing.Endpoints;
 using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
 using NexusDesk.Modules.Ticketing.RealTime;
+using NexusDesk.SharedKernel.Automation;
 using NexusDesk.SharedKernel.Modules;
 using NexusDesk.SharedKernel.MultiTenancy;
 using NexusDesk.SharedKernel.Primitives;
@@ -68,6 +70,14 @@ public static class TicketingModuleExtensions
         services.AddScoped<IDomainEventHandler<TicketStatusChangedDomainEvent>, TicketRealtimeNotificationHandler>();
         services.AddScoped<IDomainEventHandler<TicketPriorityChangedDomainEvent>, TicketRealtimeNotificationHandler>();
         services.AddScoped<IDomainEventHandler<TicketCommentAddedDomainEvent>, TicketRealtimeNotificationHandler>();
+        services.AddScoped<IDomainEventHandler<TicketSlaBreachedDomainEvent>, TicketRealtimeNotificationHandler>();
+
+        // Automation Integration Bridge & SLA Breach Evaluator
+        services.AddScoped<ITicketAutomationActions, TicketAutomationActions>();
+        services.AddScoped<ITicketSlaBreachEvaluator, TicketSlaBreachEvaluator>();
+        services.AddScoped<IDomainEventHandler<TicketCreatedDomainEvent>, TicketingAutomationEventBridge>();
+        services.AddScoped<IDomainEventHandler<TicketPriorityChangedDomainEvent>, TicketingAutomationEventBridge>();
+        services.AddScoped<IDomainEventHandler<TicketSlaBreachedDomainEvent>, TicketingAutomationEventBridge>();
 
         return services;
     }
