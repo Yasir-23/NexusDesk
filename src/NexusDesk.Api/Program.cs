@@ -8,6 +8,7 @@ using NexusDesk.Modules.Automation;
 using NexusDesk.Modules.Automation.Persistence;
 using NexusDesk.Modules.Billing;
 using NexusDesk.Modules.Chat;
+using NexusDesk.Modules.Chat.Persistence;
 using NexusDesk.Modules.Identity;
 using NexusDesk.Modules.Identity.Authorization;
 using NexusDesk.Modules.Identity.Endpoints;
@@ -170,6 +171,12 @@ using (var scope = app.Services.CreateScope())
     {
         await automationInitializer.InitializeAsync();
     }
+
+    var chatInitializer = scope.ServiceProvider.GetService<IChatSchemaInitializer>();
+    if (chatInitializer != null)
+    {
+        await chatInitializer.InitializeAsync();
+    }
 }
 
 // Configure Middleware Pipeline
@@ -202,6 +209,9 @@ app.UseTicketingModule();
 
 // SLA Engine & Automation Rules REST APIs
 app.UseAutomationModule();
+
+// Omnichannel Live Chat Module & SignalR ChatHub
+app.UseChatModule();
 
 // Real-Time SignalR Hubs
 app.MapHub<TicketHub>("/hubs/tickets");

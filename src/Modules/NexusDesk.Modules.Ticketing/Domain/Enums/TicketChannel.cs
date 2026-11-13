@@ -7,5 +7,6 @@ public enum TicketChannel
 {
     WebPortal = 1,
     Email = 2,
-    Api = 3
+    Api = 3,
+    LiveChat = 4
 }

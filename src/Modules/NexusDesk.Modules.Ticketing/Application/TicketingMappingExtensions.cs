@@ -3,7 +3,7 @@ using NexusDesk.Modules.Ticketing.Domain.Entities;
 
 namespace NexusDesk.Modules.Ticketing.Application;
 
-internal static class TicketingMappingExtensions
+public static class TicketingMappingExtensions
 {
     public static TicketSummaryResponse ToSummaryResponse(this Ticket ticket)
     {
@@ -36,16 +36,18 @@ internal static class TicketingMappingExtensions
             .Select(c => c.ToDto())
             .ToList();
 
-        var activityLogs = ticket.ActivityLogs
-            .OrderBy(a => a.TimestampUtc)
-            .Select(a => new TicketActivityLogDto(
-                a.Id,
-                a.PerformedByUserId,
-                a.Action,
-                a.OldValue,
-                a.NewValue,
-                a.TimestampUtc))
-            .ToList();
+        var activityLogs = isCustomer
+            ? new List<TicketActivityLogDto>()
+            : ticket.ActivityLogs
+                .OrderBy(a => a.TimestampUtc)
+                .Select(a => new TicketActivityLogDto(
+                    a.Id,
+                    a.PerformedByUserId,
+                    a.Action,
+                    a.OldValue,
+                    a.NewValue,
+                    a.TimestampUtc))
+                .ToList();
 
         return new TicketDetailsResponse(
             ticket.Id,

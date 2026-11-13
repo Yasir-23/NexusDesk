@@ -85,12 +85,16 @@ public static class TicketingModuleExtensions
         services.AddScoped<IDomainEventHandler<TicketSlaBreachedDomainEvent>, TicketingOutboxIntegrationEventBridge>();
         services.AddScoped<IDomainEventHandler<TicketResolvedDomainEvent>, TicketingOutboxIntegrationEventBridge>();
 
+        // SharedKernel Ticket Creation Service
+        services.AddScoped<NexusDesk.SharedKernel.Ticketing.ITicketCreationService, NexusDesk.Modules.Ticketing.Application.Services.TicketCreationService>();
+
         return services;
     }
 
     public static WebApplication UseTicketingModule(this WebApplication app)
     {
         app.MapTicketingEndpoints();
+        app.MapPortalEndpoints();
         return app;
     }
 }
