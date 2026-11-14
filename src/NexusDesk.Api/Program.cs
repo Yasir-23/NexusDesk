@@ -14,6 +14,7 @@ using NexusDesk.Modules.Identity.Authorization;
 using NexusDesk.Modules.Identity.Endpoints;
 using NexusDesk.Modules.Identity.Persistence;
 using NexusDesk.Modules.KnowledgeBase;
+using NexusDesk.Modules.KnowledgeBase.Persistence;
 using NexusDesk.Modules.Tenants;
 using NexusDesk.Modules.Tenants.Endpoints;
 using NexusDesk.Modules.Tenants.Middleware;
@@ -177,6 +178,12 @@ using (var scope = app.Services.CreateScope())
     {
         await chatInitializer.InitializeAsync();
     }
+
+    var kbInitializer = scope.ServiceProvider.GetService<IKnowledgeBaseSchemaInitializer>();
+    if (kbInitializer != null)
+    {
+        await kbInitializer.InitializeAsync();
+    }
 }
 
 // Configure Middleware Pipeline
@@ -212,6 +219,9 @@ app.UseAutomationModule();
 
 // Omnichannel Live Chat Module & SignalR ChatHub
 app.UseChatModule();
+
+// Knowledge Base & Article Deflection REST APIs
+app.UseKnowledgeBaseModule();
 
 // Real-Time SignalR Hubs
 app.MapHub<TicketHub>("/hubs/tickets");
