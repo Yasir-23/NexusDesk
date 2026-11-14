@@ -24,11 +24,13 @@ public static class IdentityPermissions
     public const string KnowledgeBaseManage = "kb:manage";
     public const string KnowledgeBaseRead = "kb:read";
     public const string AnalyticsRead = "analytics:read";
+    public const string BillingRead = "billing:read";
+    public const string BillingManage = "billing:manage";
 
     public static string[] GetPermissionsForRole(string role) => role switch
     {
-        IdentityRoles.SuperAdmin => [PlatformManage, TenantsManage, AgentsManage, SettingsManage, TicketsRead, TicketsWrite, KnowledgeBaseManage, KnowledgeBaseRead, AnalyticsRead],
-        IdentityRoles.TenantAdmin => [AgentsManage, SettingsManage, TicketsRead, TicketsWrite, KnowledgeBaseManage, KnowledgeBaseRead, AnalyticsRead],
+        IdentityRoles.SuperAdmin => [PlatformManage, TenantsManage, AgentsManage, SettingsManage, TicketsRead, TicketsWrite, KnowledgeBaseManage, KnowledgeBaseRead, AnalyticsRead, BillingRead, BillingManage],
+        IdentityRoles.TenantAdmin => [AgentsManage, SettingsManage, TicketsRead, TicketsWrite, KnowledgeBaseManage, KnowledgeBaseRead, AnalyticsRead, BillingRead, BillingManage],
         IdentityRoles.Agent => [TicketsRead, TicketsWrite, KnowledgeBaseManage, KnowledgeBaseRead, AnalyticsRead],
         IdentityRoles.Customer => [TicketsRead, TicketsWrite, KnowledgeBaseRead],
         _ => []

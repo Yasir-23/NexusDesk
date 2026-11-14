@@ -7,6 +7,7 @@ using NexusDesk.Api.Infrastructure;
 using NexusDesk.Modules.Automation;
 using NexusDesk.Modules.Automation.Persistence;
 using NexusDesk.Modules.Billing;
+using NexusDesk.Modules.Billing.Persistence;
 using NexusDesk.Modules.Chat;
 using NexusDesk.Modules.Chat.Persistence;
 using NexusDesk.Modules.Identity;
@@ -184,6 +185,12 @@ using (var scope = app.Services.CreateScope())
     {
         await kbInitializer.InitializeAsync();
     }
+
+    var billingInitializer = scope.ServiceProvider.GetService<IBillingSchemaInitializer>();
+    if (billingInitializer != null)
+    {
+        await billingInitializer.InitializeAsync();
+    }
 }
 
 // Configure Middleware Pipeline
@@ -222,6 +229,9 @@ app.UseChatModule();
 
 // Knowledge Base & Article Deflection REST APIs
 app.UseKnowledgeBaseModule();
+
+// Multi-Tenant SaaS Billing, Plan Quotas & Usage Metering REST APIs
+app.UseBillingModule();
 
 // Real-Time SignalR Hubs
 app.MapHub<TicketHub>("/hubs/tickets");

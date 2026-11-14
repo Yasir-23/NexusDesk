@@ -77,7 +77,7 @@ public class TenantScopedTests
         var rule = new AutomationRule(Guid.NewGuid(), tenantId, "Escalate", "ticket.created");
         rule.TenantId.Should().Be(tenantId);
 
-        var invoice = new Invoice(Guid.NewGuid(), tenantId, "2026-11", 49.99m, "Pending");
+        var invoice = new BillingInvoice(Guid.NewGuid(), tenantId, "INV-202611-0001", "Pro", 9900, "usd", "Paid", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMonths(1));
         invoice.TenantId.Should().Be(tenantId);
     }
 }
