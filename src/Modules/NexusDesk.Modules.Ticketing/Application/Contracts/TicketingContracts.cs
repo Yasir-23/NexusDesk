@@ -98,3 +98,12 @@ public sealed record PagedTicketsResponse(
     int PageSize,
     int TotalCount,
     int TotalPages);
+
+public sealed record TicketAttachmentDto(
+    Guid Id,
+    Guid TicketId,
+    Guid UploadedByUserId,
+    string FileName,
+    string ContentType,
+    long SizeBytes,
+    DateTimeOffset CreatedAtUtc);

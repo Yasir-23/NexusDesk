@@ -16,6 +16,7 @@ public class TicketingDbContext : DbContext
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<TicketActivityLog> TicketActivityLogs => Set<TicketActivityLog>();
     public DbSet<TicketTag> TicketTags => Set<TicketTag>();
+    public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
 
     public TicketingDbContext(
         DbContextOptions<TicketingDbContext> options,
@@ -206,6 +207,35 @@ public class TicketingDbContext : DbContext
             b.HasIndex(t => new { t.TicketId, t.Name })
                 .IsUnique()
                 .HasDatabaseName("ix_ticket_tags_ticket_name");
+
+            b.HasQueryFilter(e => e.TenantId == CurrentTenantId);
+        });
+
+        modelBuilder.Entity<TicketAttachment>(b =>
+        {
+            b.ToTable("ticket_attachments", "ticketing");
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            b.Property(a => a.TenantId).HasColumnName("tenant_id").IsRequired();
+            b.Property(a => a.TicketId).HasColumnName("ticket_id").IsRequired();
+            b.Property(a => a.UploadedByUserId).HasColumnName("uploaded_by_user_id").IsRequired();
+            b.Property(a => a.FileName).HasColumnName("file_name").HasMaxLength(255).IsRequired();
+            b.Property(a => a.ContentType).HasColumnName("content_type").HasMaxLength(100).IsRequired();
+            b.Property(a => a.SizeBytes).HasColumnName("size_bytes").IsRequired();
+            b.Property(a => a.StoragePath).HasColumnName("storage_path").HasMaxLength(500).IsRequired();
+            b.Property(a => a.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+
+            b.HasIndex(a => new { a.TenantId, a.TicketId })
+                .HasDatabaseName("ix_ticket_attachments_tenant_ticket");
+
+            b.HasIndex(a => a.TicketId)
+                .HasDatabaseName("ix_ticket_attachments_ticket_id");
+
+            b.HasOne<Ticket>()
+                .WithMany()
+                .HasForeignKey(a => a.TicketId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             b.HasQueryFilter(e => e.TenantId == CurrentTenantId);
         });

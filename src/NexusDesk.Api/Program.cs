@@ -1,6 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using NexusDesk.Api.GraphQL;
@@ -72,6 +75,92 @@ builder.Services.AddSwaggerGen(c =>
     });
 
     c.OperationFilter<TenantHeaderSwaggerOperationFilter>();
+});
+
+// 3.1. CORS Policy for Frontend SPA & SignalR
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("NexusDeskCorsPolicy", policy =>
+    {
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+            {
+                return false;
+            }
+
+            var host = uri.Host;
+            return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                   host.EndsWith(".nexusdesk.local", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(host, "nexusdesk.local", StringComparison.OrdinalIgnoreCase) ||
+                   host.EndsWith(".nexusdesk.com", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(host, "nexusdesk.com", StringComparison.OrdinalIgnoreCase);
+        })
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials()
+        .WithExposedHeaders("Content-Disposition");
+    });
+});
+
+// 3.2. Tenant-Tiered Sliding Window Rate Limiter
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.ContentType = "application/problem+json";
+        var problem = new ProblemDetails
+        {
+            Type = "https://nexusdesk.io/errors/rate-limit-exceeded",
+            Title = "Too Many Requests",
+            Status = StatusCodes.Status429TooManyRequests,
+            Detail = "Rate limit quota exceeded for this tenant. Please retry after some time.",
+            Instance = context.HttpContext.Request.Path
+        };
+        problem.Extensions["code"] = "RATE_LIMIT_EXCEEDED";
+        await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken: token);
+    };
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var rateLimitEnabled = builder.Configuration.GetValue<bool?>("RateLimiting:Enabled") ?? false;
+        if (!rateLimitEnabled)
+        {
+            return RateLimitPartition.GetNoLimiter("unlimited");
+        }
+
+        var tenantSubdomain = httpContext.Request.Headers["X-Tenant-Subdomain"].ToString();
+        var partitionKey = !string.IsNullOrWhiteSpace(tenantSubdomain)
+            ? $"tenant:{tenantSubdomain.Trim().ToLowerInvariant()}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+
+        var tenantAccessor = httpContext.RequestServices.GetService<NexusDesk.SharedKernel.MultiTenancy.ITenantContextAccessor>();
+        var planTier = tenantAccessor?.TenantContext?.PlanTier ?? NexusDesk.SharedKernel.MultiTenancy.TenantPlanTier.Free;
+
+        var permitLimit = planTier switch
+        {
+            NexusDesk.SharedKernel.MultiTenancy.TenantPlanTier.Enterprise => builder.Configuration.GetValue<int?>("RateLimiting:EnterprisePermitLimit") ?? 2400,
+            NexusDesk.SharedKernel.MultiTenancy.TenantPlanTier.Pro => builder.Configuration.GetValue<int?>("RateLimiting:ProPermitLimit") ?? 600,
+            _ => builder.Configuration.GetValue<int?>("RateLimiting:FreePermitLimit") ?? 120
+        };
+
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey,
+            _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
 });
 
 // 4. Database & Cache Connection Resolution
@@ -220,6 +309,10 @@ app.UseSwaggerUI(c =>
 
 // Map Default Health Check Endpoints (/health/live, /health/ready)
 app.MapDefaultEndpoints();
+
+// CORS & Rate Limiting Pipeline
+app.UseCors("NexusDeskCorsPolicy");
+app.UseRateLimiter();
 
 // Authentication & Tenant Authorization Middleware Pipeline
 app.UseAuthentication();

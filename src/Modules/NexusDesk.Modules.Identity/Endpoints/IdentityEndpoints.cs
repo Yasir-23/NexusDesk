@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NexusDesk.Modules.Identity.Authorization;
 using NexusDesk.Modules.Identity.Domain;
 using NexusDesk.Modules.Identity.Persistence;
@@ -15,6 +16,7 @@ using NexusDesk.Modules.Identity.Security;
 using NexusDesk.Modules.Identity.Tokens;
 using NexusDesk.Modules.Tenants.Domain;
 using NexusDesk.Modules.Tenants.Persistence;
+using NexusDesk.SharedKernel.Audit;
 using NexusDesk.SharedKernel.MultiTenancy;
 using Npgsql;
 
@@ -1039,6 +1041,103 @@ public static class IdentityEndpoints
         })
         .WithName("RegisterCustomer")
         .WithTags("UserManagement");
+
+        // 8. GDPR Privacy & Erasure (/api/v1/privacy)
+        var privacyGroup = app.MapGroup("/api/v1/privacy")
+            .WithTags("Privacy & GDPR");
+
+        privacyGroup.MapPost("/forget-me", async (
+            ClaimsPrincipal principal,
+            IdentityDbContext identityDb,
+            ITenantContextAccessor tenantContextAccessor,
+            IServiceProvider serviceProvider,
+            HttpContext httpContext) =>
+        {
+            var userIdClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
+            if (!Guid.TryParse(userIdClaim, out var userId) || userId == Guid.Empty)
+            {
+                return Results.Unauthorized();
+            }
+
+            var roleClaim = principal.FindFirstValue(ClaimTypes.Role) ?? principal.FindFirstValue("role");
+            if (string.Equals(roleClaim, IdentityRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.BadRequest(new ProblemDetails
+                {
+                    Type = "https://nexusdesk.io/errors/invalid-operation",
+                    Title = "SuperAdmin Erasure Prohibited",
+                    Detail = "SuperAdmin accounts are protected from self-erasure via customer privacy workflows.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
+            var tenantContext = tenantContextAccessor.TenantContext;
+            var tenantId = tenantContext?.TenantId ?? Guid.Empty;
+
+            var user = await identityDb.Users
+                .FirstOrDefaultAsync(u => u.Id == userId && (tenantId == Guid.Empty || u.TenantId == tenantId));
+
+            if (user == null)
+            {
+                return Results.NotFound(new ProblemDetails
+                {
+                    Title = "User Not Found",
+                    Detail = $"User '{userId}' was not found in the current tenant.",
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
+
+            if (string.Equals(user.Role, IdentityRoles.SuperAdmin, StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.BadRequest(new ProblemDetails
+                {
+                    Type = "https://nexusdesk.io/errors/invalid-operation",
+                    Title = "SuperAdmin Erasure Prohibited",
+                    Detail = "SuperAdmin accounts are protected from self-erasure via customer privacy workflows.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            user.Anonymize(now);
+
+            // Revoke active refresh tokens
+            var refreshTokens = await identityDb.RefreshTokens
+                .Where(rt => rt.UserId == user.Id && rt.TenantId == user.TenantId)
+                .ToListAsync();
+
+            foreach (var token in refreshTokens)
+            {
+                token.Revoke(null, now);
+            }
+
+            await identityDb.SaveChangesAsync();
+
+            // Record audit entry
+            var auditWriter = serviceProvider.GetService<IAuditLogWriter>();
+            if (auditWriter != null)
+            {
+                await auditWriter.WriteAsync(
+                    user.TenantId,
+                    action: "privacy.forget_me",
+                    resourceType: "user",
+                    resourceId: user.Id.ToString("D"),
+                    actorUserId: user.Id,
+                    actorEmail: user.Email,
+                    metadataJson: JsonSerializer.Serialize(new { anonymizedAtUtc = now }),
+                    ipAddress: httpContext.Connection.RemoteIpAddress?.ToString());
+            }
+
+            return Results.Ok(new
+            {
+                anonymized = true,
+                userId = user.Id,
+                anonymizedAtUtc = now
+            });
+        })
+        .RequireAuthorization(IdentityPolicies.AuthenticatedTenantUser)
+        .WithName("GdprForgetMe")
+        .WithTags("Privacy & GDPR");
 
         return app;
     }

@@ -41,6 +41,13 @@ public class TicketingEndToEndIntegrationTests : IClassFixture<WebApplicationFac
 
     private async Task EnsureTenantsActiveAsync()
     {
+        await using (var conn = new Npgsql.NpgsqlConnection("Host=127.0.0.1;Port=56132;Database=nexusdesk_shared;Username=postgres;Password=postgres;SSL Mode=Disable"))
+        {
+            await conn.OpenAsync();
+            await using var cmd = new Npgsql.NpgsqlCommand("DELETE FROM billing.usage_meter_records WHERE metric_name = 'tickets_created';", conn);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         var rootClient = _factory.CreateClient();
         await rootClient.PostAsJsonAsync("/api/v1/tenants/provision",
             new ProvisionTenantRequest("Acme Corporation", "acme", "admin@acme.com", "Acme Admin", "Pro"));
@@ -409,6 +416,8 @@ public class TicketingEndToEndIntegrationTests : IClassFixture<WebApplicationFac
             .GetProperty("requestBody").GetProperty("content").TryGetProperty("application/json", out _).Should().BeTrue();
         paths.GetProperty("/api/v1/tickets/{id}/comments").GetProperty("post")
             .GetProperty("requestBody").GetProperty("content").TryGetProperty("application/json", out _).Should().BeTrue();
+        paths.GetProperty("/api/v1/tickets/{id}/attachments").GetProperty("post")
+            .GetProperty("requestBody").GetProperty("content").TryGetProperty("multipart/form-data", out _).Should().BeTrue();
 
         var schemas = doc.RootElement.GetProperty("components").GetProperty("schemas");
         schemas.TryGetProperty("CreateTicketRequest", out _).Should().BeTrue();
@@ -423,5 +432,53 @@ public class TicketingEndToEndIntegrationTests : IClassFixture<WebApplicationFac
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TicketingDbContext>();
         db.Database.HasPendingModelChanges().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TicketAttachments_UploadListAndDownload_ShouldSucceedWithTenantIsolation()
+    {
+        await EnsureTenantsActiveAsync();
+
+        var (customerClient, _) = await RegisterAndLoginCustomerAsync("acme");
+
+        // 1. Customer creates a ticket
+        var createTicketRes = await customerClient.PostAsJsonAsync("/api/v1/tickets",
+            new CreateTicketRequest("Attachment Test Ticket", "Testing ticket file attachments", TicketPriority.Medium));
+        createTicketRes.StatusCode.Should().Be(HttpStatusCode.Created);
+        var ticket = await createTicketRes.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        ticket.Should().NotBeNull();
+        var ticketId = ticket!.Id;
+
+        // 2. Customer uploads a valid PNG attachment
+        var pngBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D };
+        using var content = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent(pngBytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Add(fileContent, "file", "screenshot.png");
+
+        var uploadRes = await customerClient.PostAsync($"/api/v1/tickets/{ticketId}/attachments", content);
+        uploadRes.StatusCode.Should().Be(HttpStatusCode.Created);
+        var attachmentDto = await uploadRes.Content.ReadFromJsonAsync<TicketAttachmentDto>();
+        attachmentDto.Should().NotBeNull();
+        attachmentDto!.FileName.Should().Be("screenshot.png");
+        attachmentDto.SizeBytes.Should().Be(pngBytes.Length);
+
+        // 3. Customer lists attachments
+        var listRes = await customerClient.GetAsync($"/api/v1/tickets/{ticketId}/attachments");
+        listRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var attachments = await listRes.Content.ReadFromJsonAsync<List<TicketAttachmentDto>>();
+        attachments.Should().NotBeNull();
+        attachments!.Should().ContainSingle(a => a.Id == attachmentDto.Id);
+
+        // 4. Customer downloads attachment
+        var downloadRes = await customerClient.GetAsync($"/api/v1/tickets/{ticketId}/attachments/{attachmentDto.Id}/download");
+        downloadRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var downloadedBytes = await downloadRes.Content.ReadAsByteArrayAsync();
+        downloadedBytes.Should().Equal(pngBytes);
+
+        // 5. Cross-tenant isolation: Beta customer cannot access Acme ticket attachment
+        var (betaCustomerClient, _) = await RegisterAndLoginCustomerAsync("beta");
+        var crossTenantListRes = await betaCustomerClient.GetAsync($"/api/v1/tickets/{ticketId}/attachments");
+        crossTenantListRes.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

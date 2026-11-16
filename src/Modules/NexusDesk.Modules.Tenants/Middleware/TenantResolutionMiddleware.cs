@@ -93,6 +93,7 @@ public sealed class TenantResolutionMiddleware
                path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
                path.StartsWith("/api/v1/system", StringComparison.OrdinalIgnoreCase) ||
                path.StartsWith("/api/v1/tenants/provision", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWith("/api/v1/platform/tenants", StringComparison.OrdinalIgnoreCase) ||
                path.StartsWith("/api/v1/admin/tenants", StringComparison.OrdinalIgnoreCase);
     }
 

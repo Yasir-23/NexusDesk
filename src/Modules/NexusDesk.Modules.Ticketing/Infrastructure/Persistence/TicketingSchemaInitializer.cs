@@ -62,9 +62,46 @@ public sealed class TicketingSchemaInitializer : ITicketingSchemaInitializer
             npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "ticketing");
             npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorCodesToAdd: null);
         });
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 
         await using var dbContext = new TicketingDbContext(optionsBuilder.Options, _tenantContextAccessor);
         await dbContext.Database.MigrateAsync(cancellationToken);
+
+        const string attachmentsDdl = """
+            CREATE TABLE IF NOT EXISTS ticketing.ticket_attachments (
+                id uuid NOT NULL,
+                tenant_id uuid NOT NULL,
+                ticket_id uuid NOT NULL,
+                uploaded_by_user_id uuid NOT NULL,
+                file_name character varying(255) NOT NULL,
+                content_type character varying(100) NOT NULL,
+                size_bytes bigint NOT NULL,
+                storage_path character varying(500) NOT NULL,
+                created_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT pk_ticket_attachments PRIMARY KEY (id),
+                CONSTRAINT fk_ticket_attachments_tickets_ticket_id FOREIGN KEY (ticket_id) REFERENCES ticketing.tickets (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_ticket_attachments_tenant_ticket ON ticketing.ticket_attachments (tenant_id, ticket_id);
+
+            ALTER TABLE ticketing.ticket_attachments ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE ticketing.ticket_attachments FORCE ROW LEVEL SECURITY;
+
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies 
+                    WHERE schemaname = 'ticketing' 
+                      AND tablename = 'ticket_attachments' 
+                      AND policyname = 'tenant_isolation_policy'
+                ) THEN
+                    CREATE POLICY tenant_isolation_policy ON ticketing.ticket_attachments
+                        USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+                        WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+                END IF;
+            END $$;
+            """;
+        await dbContext.Database.ExecuteSqlRawAsync(attachmentsDdl, cancellationToken);
     }
 
     private async Task MigrateDedicatedTenantDatabasesAsync(NpgsqlConnection defaultConn, CancellationToken cancellationToken)

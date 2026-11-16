@@ -44,8 +44,8 @@ public static class TenantEndpoints
     {
         var group = app.MapGroup("/api/v1");
 
-        // 1. Provisioning endpoint
-        group.MapPost("/tenants/provision", async (
+        // 1. Provisioning endpoint & platform alias
+        var provisionHandler = async (
             [FromBody] ProvisionTenantRequest request,
             CatalogDbContext catalogDb,
             ITenantDatabaseProvisioner provisioner,
@@ -281,12 +281,18 @@ public static class TenantEndpoints
                 CreatedAtUtc: tenant.CreatedAtUtc);
 
             return Results.Created($"/api/v1/admin/tenants/{tenant.Id}", response);
-        })
-        .WithName("ProvisionTenant")
-        .WithTags("Tenants");
+        };
 
-        // 2. Admin: List all tenants
-        group.MapGet("/admin/tenants", async (
+        group.MapPost("/tenants/provision", provisionHandler)
+            .WithName("ProvisionTenant")
+            .WithTags("Tenants");
+
+        group.MapPost("/platform/tenants", provisionHandler)
+            .WithName("PlatformProvisionTenant")
+            .WithTags("PlatformAdmin");
+
+        // 2. Admin: List all tenants & platform alias
+        var listTenantsHandler = async (
             CatalogDbContext catalogDb,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20) =>
@@ -322,13 +328,20 @@ public static class TenantEndpoints
                 totalCount = total,
                 items
             });
-        })
-        .RequireAuthorization("PlatformSuperAdminOnly")
-        .WithName("ListTenants")
-        .WithTags("PlatformAdmin");
+        };
 
-        // 3. Admin: Get tenant by id with audit logs
-        group.MapGet("/admin/tenants/{tenantId:guid}", async (
+        group.MapGet("/admin/tenants", listTenantsHandler)
+            .RequireAuthorization("PlatformSuperAdminOnly")
+            .WithName("ListTenants")
+            .WithTags("PlatformAdmin");
+
+        group.MapGet("/platform/tenants", listTenantsHandler)
+            .RequireAuthorization("PlatformSuperAdminOnly")
+            .WithName("PlatformListTenants")
+            .WithTags("PlatformAdmin");
+
+        // 3. Admin: Get tenant by id with audit logs & platform alias
+        var getTenantByIdHandler = async (
             Guid tenantId,
             CatalogDbContext catalogDb) =>
         {
@@ -370,13 +383,20 @@ public static class TenantEndpoints
                 },
                 auditLogs
             });
-        })
-        .RequireAuthorization("PlatformSuperAdminOnly")
-        .WithName("GetTenantById")
-        .WithTags("PlatformAdmin");
+        };
 
-        // 4. Admin: Update tenant status (Suspend / Activate)
-        group.MapPatch("/admin/tenants/{tenantId:guid}/status", async (
+        group.MapGet("/admin/tenants/{tenantId:guid}", getTenantByIdHandler)
+            .RequireAuthorization("PlatformSuperAdminOnly")
+            .WithName("GetTenantById")
+            .WithTags("PlatformAdmin");
+
+        group.MapGet("/platform/tenants/{tenantId:guid}", getTenantByIdHandler)
+            .RequireAuthorization("PlatformSuperAdminOnly")
+            .WithName("PlatformGetTenantById")
+            .WithTags("PlatformAdmin");
+
+        // 4. Admin: Update tenant status (Suspend / Activate) & platform alias
+        var updateTenantStatusHandler = async (
             Guid tenantId,
             [FromBody] UpdateTenantStatusRequest request,
             CatalogDbContext catalogDb,
@@ -432,10 +452,17 @@ public static class TenantEndpoints
                 Status = tenant.Status.ToString(),
                 tenant.UpdatedAtUtc
             });
-        })
-        .RequireAuthorization("PlatformSuperAdminOnly")
-        .WithName("UpdateTenantStatus")
-        .WithTags("PlatformAdmin");
+        };
+
+        group.MapPatch("/admin/tenants/{tenantId:guid}/status", updateTenantStatusHandler)
+            .RequireAuthorization("PlatformSuperAdminOnly")
+            .WithName("UpdateTenantStatus")
+            .WithTags("PlatformAdmin");
+
+        group.MapPatch("/platform/tenants/{tenantId:guid}/status", updateTenantStatusHandler)
+            .RequireAuthorization("PlatformSuperAdminOnly")
+            .WithName("PlatformUpdateTenantStatus")
+            .WithTags("PlatformAdmin");
 
         // 5. Tenant-Scoped: Get Current Tenant Context & Verification Data
         group.MapGet("/tenant/current", async (

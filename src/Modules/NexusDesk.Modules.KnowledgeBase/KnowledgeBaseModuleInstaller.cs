@@ -28,6 +28,7 @@ public static class KnowledgeBaseModuleExtensions
     {
         services.AddScoped<IKnowledgeBaseSchemaInitializer, KnowledgeBaseSchemaInitializer>();
         services.AddScoped<NexusDesk.SharedKernel.Analytics.IKnowledgeBaseAnalyticsProvider, NexusDesk.Modules.KnowledgeBase.Services.KnowledgeBaseAnalyticsProvider>();
+        services.AddSingleton<NexusDesk.Modules.KnowledgeBase.Services.IPromptInjectionGuard, NexusDesk.Modules.KnowledgeBase.Services.PromptInjectionGuard>();
 
         services.AddDbContext<KnowledgeBaseDbContext>((sp, options) =>
         {
@@ -75,6 +76,7 @@ public static class KnowledgeBaseModuleExtensions
     public static WebApplication UseKnowledgeBaseModule(this WebApplication app)
     {
         app.MapKnowledgeBaseEndpoints();
+        app.MapAiEndpoints();
         return app;
     }
 }

@@ -47,6 +47,7 @@ public static class TicketingModuleExtensions
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "ticketing");
                 npgsql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorCodesToAdd: null);
             })
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(
                 sp.GetRequiredService<TenantAuditSaveChangesInterceptor>(),
                 sp.GetRequiredService<PostgresRlsConnectionInterceptor>());
@@ -87,6 +88,7 @@ public static class TicketingModuleExtensions
 
         // SharedKernel Ticket Creation Service
         services.AddScoped<NexusDesk.SharedKernel.Ticketing.ITicketCreationService, NexusDesk.Modules.Ticketing.Application.Services.TicketCreationService>();
+        services.AddScoped<NexusDesk.SharedKernel.Ticketing.ITicketDataProvider, NexusDesk.Modules.Ticketing.Application.Services.TicketDataProvider>();
         services.AddScoped<NexusDesk.SharedKernel.Analytics.ITicketingAnalyticsProvider, NexusDesk.Modules.Ticketing.Application.Services.TicketingAnalyticsProvider>();
 
         return services;
