@@ -5,8 +5,12 @@ using NexusDesk.Modules.Ticketing.Domain.Entities;
 using NexusDesk.Modules.Ticketing.Domain.Enums;
 using NexusDesk.Modules.Ticketing.Domain.ValueObjects;
 using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
+using NexusDesk.SharedKernel.Analytics;
+using NexusDesk.SharedKernel.Audit;
 using NexusDesk.SharedKernel.Automation;
+using NexusDesk.SharedKernel.Billing;
 using NexusDesk.SharedKernel.MultiTenancy;
+using NexusDesk.SharedKernel.Notifications;
 using NexusDesk.SharedKernel.Primitives;
 
 namespace NexusDesk.Modules.Ticketing.Application.Commands;
@@ -28,19 +32,28 @@ public sealed class CreateTicketCommandHandler
     private readonly ITenantContextAccessor _tenantContextAccessor;
     private readonly ITicketNumberGenerator _ticketNumberGenerator;
     private readonly ISlaPolicyProvider? _slaPolicyProvider;
+    private readonly IBillingQuotaService? _billingQuotaService;
+    private readonly IAuditLogWriter? _auditLogWriter;
+    private readonly INotificationService? _notificationService;
 
     public CreateTicketCommandHandler(
         TicketingDbContext ticketingDb,
         IdentityDbContext identityDb,
         ITenantContextAccessor tenantContextAccessor,
         ITicketNumberGenerator ticketNumberGenerator,
-        ISlaPolicyProvider? slaPolicyProvider = null)
+        ISlaPolicyProvider? slaPolicyProvider = null,
+        IBillingQuotaService? billingQuotaService = null,
+        IAuditLogWriter? auditLogWriter = null,
+        INotificationService? notificationService = null)
     {
         _ticketingDb = ticketingDb;
         _identityDb = identityDb;
         _tenantContextAccessor = tenantContextAccessor;
         _ticketNumberGenerator = ticketNumberGenerator;
         _slaPolicyProvider = slaPolicyProvider;
+        _billingQuotaService = billingQuotaService;
+        _auditLogWriter = auditLogWriter;
+        _notificationService = notificationService;
     }
 
     public async Task<Result<TicketDetailsResponse>> HandleAsync(
@@ -127,6 +140,18 @@ public sealed class CreateTicketCommandHandler
             return Result.Failure<TicketDetailsResponse>(preCheck.Error);
         }
 
+        // Live Quota Enforcement Wiring
+        if (_billingQuotaService != null)
+        {
+            var canRecord = await _billingQuotaService.CanRecordUsageAsync(tenantId, "tickets_created", 1, cancellationToken);
+            if (!canRecord)
+            {
+                return Result.Failure<TicketDetailsResponse>(Error.Failure(
+                    "Quota.PlanLimitExceeded",
+                    $"Tenant has reached the maximum ticket creation limit for the current billing period."));
+            }
+        }
+
         var strategy = _ticketingDb.Database.CreateExecutionStrategy();
         var createdTicket = await strategy.ExecuteAsync(async () =>
         {
@@ -161,6 +186,43 @@ public sealed class CreateTicketCommandHandler
         if (createdTicket.IsFailure)
         {
             return Result.Failure<TicketDetailsResponse>(createdTicket.Error);
+        }
+
+        if (_billingQuotaService != null)
+        {
+            await _billingQuotaService.RecordUsageAsync(tenantId, "tickets_created", 1, cancellationToken);
+        }
+
+        if (_auditLogWriter != null)
+        {
+            var callerEmail = await _identityDb.Users
+                .AsNoTracking()
+                .Where(u => u.Id == command.CallerUserId)
+                .Select(u => u.Email)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            await _auditLogWriter.WriteAsync(
+                tenantId,
+                "ticket.created",
+                "ticket",
+                createdTicket.Value.Id.ToString(),
+                command.CallerUserId,
+                callerEmail,
+                $"{{\"ticketNumber\":\"{createdTicket.Value.TicketNumber}\",\"title\":\"{createdTicket.Value.Title}\"}}",
+                null,
+                cancellationToken);
+        }
+
+        if (_notificationService != null && effectiveCustomerId != command.CallerUserId)
+        {
+            await _notificationService.CreateNotificationAsync(
+                tenantId,
+                effectiveCustomerId,
+                "ticket_created",
+                $"Ticket #{createdTicket.Value.TicketNumber} Created",
+                $"Your ticket '{createdTicket.Value.Title}' has been created.",
+                $"/tickets/{createdTicket.Value.Id}",
+                cancellationToken);
         }
 
         return Result.Success(createdTicket.Value.ToDetailsResponse(command.IsCustomerCaller));

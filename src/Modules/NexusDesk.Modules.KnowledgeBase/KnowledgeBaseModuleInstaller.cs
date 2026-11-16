@@ -27,6 +27,7 @@ public static class KnowledgeBaseModuleExtensions
     public static IServiceCollection AddKnowledgeBaseModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IKnowledgeBaseSchemaInitializer, KnowledgeBaseSchemaInitializer>();
+        services.AddScoped<NexusDesk.SharedKernel.Analytics.IKnowledgeBaseAnalyticsProvider, NexusDesk.Modules.KnowledgeBase.Services.KnowledgeBaseAnalyticsProvider>();
 
         services.AddDbContext<KnowledgeBaseDbContext>((sp, options) =>
         {

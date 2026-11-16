@@ -87,6 +87,7 @@ public static class TicketingModuleExtensions
 
         // SharedKernel Ticket Creation Service
         services.AddScoped<NexusDesk.SharedKernel.Ticketing.ITicketCreationService, NexusDesk.Modules.Ticketing.Application.Services.TicketCreationService>();
+        services.AddScoped<NexusDesk.SharedKernel.Analytics.ITicketingAnalyticsProvider, NexusDesk.Modules.Ticketing.Application.Services.TicketingAnalyticsProvider>();
 
         return services;
     }

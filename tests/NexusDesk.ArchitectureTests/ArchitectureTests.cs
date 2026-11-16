@@ -19,7 +19,8 @@ public class ArchitectureTests
         typeof(Modules.Chat.ChatModuleInstaller).Assembly,
         typeof(Modules.KnowledgeBase.KnowledgeBaseModuleInstaller).Assembly,
         typeof(Modules.Automation.AutomationModuleInstaller).Assembly,
-        typeof(Modules.Billing.BillingModuleInstaller).Assembly
+        typeof(Modules.Billing.BillingModuleInstaller).Assembly,
+        typeof(Modules.Analytics.AnalyticsModuleInstaller).Assembly
     ];
 
     [Fact]
@@ -49,6 +50,7 @@ public class ArchitectureTests
             "NexusDesk.Modules.KnowledgeBase",
             "NexusDesk.Modules.Automation",
             "NexusDesk.Modules.Billing",
+            "NexusDesk.Modules.Analytics",
             "NexusDesk.ServiceDefaults",
             "NexusDesk.AppHost"
         };

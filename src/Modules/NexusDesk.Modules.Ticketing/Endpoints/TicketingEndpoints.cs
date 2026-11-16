@@ -415,6 +415,11 @@ public static class TicketingEndpoints
 
     private static IResult MapErrorToProblemResult(Error error, HttpContext httpContext)
     {
+        if (error.Code.StartsWith("Quota.", StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateProblemResult(StatusCodes.Status429TooManyRequests, "Plan Quota Exceeded", error.Description, "quota_exceeded", httpContext);
+        }
+
         var (statusCode, title) = error.Type switch
         {
             ErrorType.Validation => (StatusCodes.Status400BadRequest, "Validation Failed"),

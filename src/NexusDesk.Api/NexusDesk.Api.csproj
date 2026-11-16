@@ -14,6 +14,7 @@
     <ProjectReference Include="..\Modules\NexusDesk.Modules.KnowledgeBase\NexusDesk.Modules.KnowledgeBase.csproj" />
     <ProjectReference Include="..\Modules\NexusDesk.Modules.Automation\NexusDesk.Modules.Automation.csproj" />
     <ProjectReference Include="..\Modules\NexusDesk.Modules.Billing\NexusDesk.Modules.Billing.csproj" />
+    <ProjectReference Include="..\Modules\NexusDesk.Modules.Analytics\NexusDesk.Modules.Analytics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +25,7 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="HotChocolate.AspNetCore" />
   </ItemGroup>
 
 </Project>

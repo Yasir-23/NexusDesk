@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.KnowledgeBase\NexusDesk.Modules.KnowledgeBase.csproj" />
     <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Automation\NexusDesk.Modules.Automation.csproj" />
     <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Billing\NexusDesk.Modules.Billing.csproj" />
+    <ProjectReference Include="..\..\src\Modules\NexusDesk.Modules.Analytics\NexusDesk.Modules.Analytics.csproj" />
   </ItemGroup>
 
   <ItemGroup>

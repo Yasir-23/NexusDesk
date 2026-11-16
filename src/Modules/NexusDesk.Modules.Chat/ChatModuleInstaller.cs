@@ -27,6 +27,7 @@ public static class ChatModuleExtensions
     public static IServiceCollection AddChatModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IChatSchemaInitializer, ChatSchemaInitializer>();
+        services.AddScoped<NexusDesk.SharedKernel.Analytics.IChatAnalyticsProvider, NexusDesk.Modules.Chat.Services.ChatAnalyticsProvider>();
 
         services.AddDbContext<ChatDbContext>((sp, options) =>
         {

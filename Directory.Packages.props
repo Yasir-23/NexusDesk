@@ -47,6 +47,9 @@
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="7.2.0" />
 
+    <!-- GraphQL / HotChocolate -->
+    <PackageVersion Include="HotChocolate.AspNetCore" Version="14.3.0" />
+
     <!-- Real-Time / SignalR -->
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.2" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.2" />

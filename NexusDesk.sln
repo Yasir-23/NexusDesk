@@ -37,6 +37,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusDesk.UnitTests", "test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusDesk.Analyzers", "src\NexusDesk.Analyzers\NexusDesk.Analyzers.csproj", "{B556C5A4-604E-4AFF-B1E7-56DE1AEFB0E0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusDesk.Modules.Analytics", "src\Modules\NexusDesk.Modules.Analytics\NexusDesk.Modules.Analytics.csproj", "{4BF627E8-F4B8-483A-8AED-37D9EB080A32}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -227,6 +229,18 @@ Global
 		{B556C5A4-604E-4AFF-B1E7-56DE1AEFB0E0}.Release|x64.Build.0 = Release|Any CPU
 		{B556C5A4-604E-4AFF-B1E7-56DE1AEFB0E0}.Release|x86.ActiveCfg = Release|Any CPU
 		{B556C5A4-604E-4AFF-B1E7-56DE1AEFB0E0}.Release|x86.Build.0 = Release|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Debug|x64.Build.0 = Debug|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Debug|x86.Build.0 = Debug|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Release|x64.ActiveCfg = Release|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Release|x64.Build.0 = Release|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Release|x86.ActiveCfg = Release|Any CPU
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -248,5 +262,6 @@ Global
 		{08C59D28-4953-4EC5-BC01-7489F83BBE37} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 		{04183A52-5531-42A7-94DB-159EE791813A} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 		{B556C5A4-604E-4AFF-B1E7-56DE1AEFB0E0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{4BF627E8-F4B8-483A-8AED-37D9EB080A32} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
 	EndGlobalSection
 EndGlobal

@@ -3,7 +3,10 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
+using NexusDesk.Api.GraphQL;
 using NexusDesk.Api.Infrastructure;
+using NexusDesk.Modules.Analytics;
+using NexusDesk.Modules.Analytics.Persistence;
 using NexusDesk.Modules.Automation;
 using NexusDesk.Modules.Automation.Persistence;
 using NexusDesk.Modules.Billing;
@@ -136,7 +139,8 @@ IModuleInstaller[] installers =
     new ChatModuleInstaller(),
     new KnowledgeBaseModuleInstaller(),
     new AutomationModuleInstaller(),
-    new BillingModuleInstaller()
+    new BillingModuleInstaller(),
+    new AnalyticsModuleInstaller()
 ];
 
 foreach (var installer in installers)
@@ -144,6 +148,11 @@ foreach (var installer in installers)
     installer.Install(builder.Services, builder.Configuration);
     moduleRegistry.RegisterModule(installer.ModuleName);
 }
+
+// 7. GraphQL API Server (HotChocolate)
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<Query>();
 
 var app = builder.Build();
 
@@ -191,6 +200,12 @@ using (var scope = app.Services.CreateScope())
     {
         await billingInitializer.InitializeAsync();
     }
+
+    var analyticsInitializer = scope.ServiceProvider.GetService<IAnalyticsSchemaInitializer>();
+    if (analyticsInitializer != null)
+    {
+        await analyticsInitializer.InitializeAsync();
+    }
 }
 
 // Configure Middleware Pipeline
@@ -232,6 +247,12 @@ app.UseKnowledgeBaseModule();
 
 // Multi-Tenant SaaS Billing, Plan Quotas & Usage Metering REST APIs
 app.UseBillingModule();
+
+// Executive Analytics, Audit Logs & In-App Notifications REST APIs
+app.UseAnalyticsModule();
+
+// GraphQL API Endpoint (/graphql via HotChocolate)
+app.MapGraphQL("/graphql");
 
 // Real-Time SignalR Hubs
 app.MapHub<TicketHub>("/hubs/tickets");

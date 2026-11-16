@@ -4,6 +4,7 @@ using NexusDesk.Modules.Identity.Persistence;
 using NexusDesk.Modules.Ticketing.Application.Contracts;
 using NexusDesk.Modules.Ticketing.Infrastructure.Persistence;
 using NexusDesk.SharedKernel.MultiTenancy;
+using NexusDesk.SharedKernel.Notifications;
 using NexusDesk.SharedKernel.Primitives;
 
 namespace NexusDesk.Modules.Ticketing.Application.Commands;
@@ -19,15 +20,18 @@ public sealed class AssignTicketCommandHandler
     private readonly TicketingDbContext _ticketingDb;
     private readonly IdentityDbContext _identityDb;
     private readonly ITenantContextAccessor _tenantContextAccessor;
+    private readonly INotificationService? _notificationService;
 
     public AssignTicketCommandHandler(
         TicketingDbContext ticketingDb,
         IdentityDbContext identityDb,
-        ITenantContextAccessor tenantContextAccessor)
+        ITenantContextAccessor tenantContextAccessor,
+        INotificationService? notificationService = null)
     {
         _ticketingDb = ticketingDb;
         _identityDb = identityDb;
         _tenantContextAccessor = tenantContextAccessor;
+        _notificationService = notificationService;
     }
 
     public async Task<Result<TicketDetailsResponse>> HandleAsync(
@@ -102,6 +106,18 @@ public sealed class AssignTicketCommandHandler
             return Result.Failure<TicketDetailsResponse>(Error.Conflict(
                 "Ticket.ConcurrencyConflict",
                 "The ticket was modified by another request. Please refresh and retry."));
+        }
+
+        if (_notificationService != null)
+        {
+            await _notificationService.CreateNotificationAsync(
+                tenantId,
+                command.AgentId,
+                "ticket_assigned",
+                $"Assigned to Ticket #{ticket.TicketNumber}",
+                $"You have been assigned to ticket '{ticket.Title}'.",
+                $"/tickets/{ticket.Id}",
+                cancellationToken);
         }
 
         return Result.Success(ticket.ToDetailsResponse(isCustomer: false));

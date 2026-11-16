@@ -22,16 +22,44 @@ public static class AuthTestTokenHelper
         return tokenService.GenerateTokenResponse(user, "platform", "Enterprise").access_token;
     }
 
-    public static string CreateTenantAdminToken(WebApplicationFactory<Program> factory, Guid tenantId, string subdomain, string planTier = "Pro")
+    public static string CreateTenantAdminToken(WebApplicationFactory<Program> factory, Guid tenantId, string subdomain, string planTier = "Pro", Guid? userId = null)
     {
         using var scope = factory.Services.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
         var user = new User(
-            Guid.NewGuid(),
+            userId ?? Guid.NewGuid(),
             tenantId,
             $"admin@{subdomain}.com",
             $"{subdomain} Admin",
             IdentityRoles.TenantAdmin,
+            "hash");
+        return tokenService.GenerateTokenResponse(user, subdomain, planTier).access_token;
+    }
+
+    public static string CreateAgentToken(WebApplicationFactory<Program> factory, Guid tenantId, string subdomain, string planTier = "Pro", Guid? userId = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var user = new User(
+            userId ?? Guid.NewGuid(),
+            tenantId,
+            $"agent@{subdomain}.com",
+            $"{subdomain} Agent",
+            IdentityRoles.Agent,
+            "hash");
+        return tokenService.GenerateTokenResponse(user, subdomain, planTier).access_token;
+    }
+
+    public static string CreateCustomerToken(WebApplicationFactory<Program> factory, Guid tenantId, string subdomain, string planTier = "Pro", Guid? userId = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var user = new User(
+            userId ?? Guid.NewGuid(),
+            tenantId,
+            $"customer@{subdomain}.com",
+            $"{subdomain} Customer",
+            IdentityRoles.Customer,
             "hash");
         return tokenService.GenerateTokenResponse(user, subdomain, planTier).access_token;
     }

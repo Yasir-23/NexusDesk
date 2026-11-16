@@ -76,8 +76,8 @@ public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
             extensions.Should().Contain("uuid-ossp");
         }
 
-        // 2. Verify 6 required schemas
-        var expectedSchemas = new[] { "identity", "tenants", "ticketing", "knowledge", "automation", "billing" };
+        // 2. Verify required schemas
+        var expectedSchemas = new[] { "identity", "tenants", "ticketing", "knowledge", "automation", "billing", "analytics" };
         await using (var cmd = new NpgsqlCommand("SELECT schema_name FROM information_schema.schemata WHERE schema_name = ANY(@schemas);", connection))
         {
             cmd.Parameters.AddWithValue("schemas", expectedSchemas);
@@ -92,7 +92,7 @@ public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task GetSystemInfo_ShouldReturnOk_WithAllSevenModulesRegistered()
+    public async Task GetSystemInfo_ShouldReturnOk_WithAllEightModulesRegistered()
     {
         var client = _factory.CreateClient();
 
@@ -117,7 +117,8 @@ public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
             "Chat",
             "KnowledgeBase",
             "Automation",
-            "Billing"
+            "Billing",
+            "Analytics"
         ]);
 
         var connectivity = jsonDoc.RootElement.GetProperty("connectivity");
