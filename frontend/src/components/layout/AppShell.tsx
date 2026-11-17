@@ -1,8 +1,9 @@
 import { Menu, Moon, Sun, X } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AccountMenu } from './AccountMenu';
 import { Logo } from './Logo';
+import { RealtimeBridge, RealtimeIndicator } from './Realtime';
 import { TenantContextBadge } from './TenantContextBadge';
 import { navFor } from '../../lib/navigation';
 import { useAuthStore } from '../../stores/auth';
@@ -68,6 +69,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh">
+      <RealtimeBridge />
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-zinc-200 bg-zinc-100/60 lg:block dark:border-zinc-800 dark:bg-zinc-900/40">
         <Sidebar />
@@ -105,6 +107,7 @@ export function AppShell() {
             <TenantContextBadge />
           </div>
           <div className="ml-auto flex items-center gap-1">
+            <RealtimeIndicator />
             <button
               type="button"
               onClick={toggle}
@@ -117,9 +120,20 @@ export function AppShell() {
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
+    </div>
+  );
+}
+
+function PageFallback() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Loading page">
+      <div className="h-7 w-48 animate-pulse rounded-md bg-zinc-200/70 dark:bg-zinc-800" />
+      <div className="h-64 w-full animate-pulse rounded-xl bg-zinc-200/70 dark:bg-zinc-800" />
     </div>
   );
 }

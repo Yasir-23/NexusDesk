@@ -6,9 +6,6 @@ import { NAV_SECTIONS } from '../lib/navigation';
 
 /** Endpoints each upcoming page will consume (from the API contract). */
 const PLANNED_ENDPOINTS: Record<string, string[]> = {
-  '/tickets': ['GET /api/v1/tickets', 'PATCH /api/v1/tickets/{id}/assign', 'POST /api/v1/ai/tickets/{id}/suggest-reply', 'SignalR /hubs/tickets'],
-  '/chat': ['GET /api/v1/chat/sessions', 'POST /api/v1/chat/sessions/{id}/claim', 'SignalR /hubs/chat'],
-  '/kb': ['GET /api/v1/kb/categories', 'POST /api/v1/kb/articles', 'GET /api/v1/kb/search'],
   '/analytics': ['GET /api/v1/analytics/overview', 'GET /api/v1/analytics/tickets/trends', 'GET /api/v1/analytics/export/tickets.csv'],
   '/admin/sla': ['GET /api/v1/tenant-admin/sla-policies', 'PUT /api/v1/tenant-admin/sla-policies'],
   '/admin/automation': ['POST /api/v1/tenant-admin/automation-rules', 'PATCH /api/v1/tenant-admin/automation-rules/{id}/toggle'],
@@ -16,8 +13,6 @@ const PLANNED_ENDPOINTS: Record<string, string[]> = {
   '/admin/billing': ['GET /api/v1/billing/plans', 'GET /api/v1/billing/subscription', 'POST /api/v1/billing/subscription/change-plan'],
   '/admin/audit': ['GET /api/v1/audit-logs'],
   '/portal': ['GET /api/v1/portal/tickets', 'POST /api/v1/portal/tickets', 'POST /api/v1/portal/tickets/{id}/replies'],
-  '/portal/chat': ['POST /api/v1/chat/sessions', 'SignalR /hubs/chat'],
-  '/portal/kb': ['GET /api/v1/kb/search'],
 };
 
 export function PlaceholderPage() {

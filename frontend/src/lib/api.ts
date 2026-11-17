@@ -280,6 +280,48 @@ export const api = {
 };
 
 // ---------------------------------------------------------------------------
+// Authenticated binary downloads (attachments). `<a href>` can't carry the bearer token or
+// tenant header, so the file is fetched as a blob and saved through an object URL.
+// ---------------------------------------------------------------------------
+
+/** Extracts the file name from `Content-Disposition` (RFC 6266 `filename*` preferred). */
+export function fileNameFromDisposition(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const star = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      /* fall through */
+    }
+  }
+  const plain = /filename\s*=\s*("?)([^";]+)\1/i.exec(header);
+  return plain?.[2].trim();
+}
+
+export async function apiDownload(path: string, opts: Pick<RequestOptions, 'tenant' | 'signal'> = {}) {
+  let res = await send(path, { ...opts, method: 'GET', headers: { Accept: '*/*' } });
+  if (res.status === 401 && useAuthStore.getState().accessToken && (await refreshAccessToken())) {
+    res = await send(path, { ...opts, method: 'GET', headers: { Accept: '*/*' } });
+  }
+  if (!res.ok) throw parseProblemDetails(res.status, await readBody(res), res.statusText);
+  return { blob: await res.blob(), fileName: fileNameFromDisposition(res.headers.get('content-disposition')) };
+}
+
+/** Hands a blob to the browser as a file download. */
+export function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+// ---------------------------------------------------------------------------
 // Health probes return 200/503 with arbitrary bodies, so they get a raw helper.
 // ---------------------------------------------------------------------------
 

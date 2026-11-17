@@ -36,7 +36,7 @@ export interface NavItem {
   icon: LucideIcon;
   roles: Role[];
   /** Milestone that implements the page; omitted = live now. */
-  milestone?: 2 | 3;
+  milestone?: 3;
 }
 
 export interface NavSection {
@@ -59,9 +59,9 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Workspace',
     items: [
       { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, roles: STAFF },
-      { to: '/tickets', label: 'Tickets', icon: Ticket, roles: STAFF, milestone: 2 },
-      { to: '/chat', label: 'Live Chat', icon: MessagesSquare, roles: STAFF, milestone: 2 },
-      { to: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: STAFF, milestone: 2 },
+      { to: '/tickets', label: 'Tickets', icon: Ticket, roles: STAFF },
+      { to: '/chat', label: 'Live Chat', icon: MessagesSquare, roles: STAFF },
+      { to: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: STAFF },
       { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: STAFF, milestone: 3 },
     ],
   },
@@ -79,8 +79,8 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Support',
     items: [
       { to: '/portal', label: 'My Requests', icon: LifeBuoy, roles: ['Customer'] },
-      { to: '/portal/chat', label: 'Live Chat', icon: MessagesSquare, roles: ['Customer'], milestone: 2 },
-      { to: '/portal/kb', label: 'Help Center', icon: BookOpen, roles: ['Customer'], milestone: 2 },
+      { to: '/chat', label: 'Live Chat', icon: MessagesSquare, roles: ['Customer'] },
+      { to: '/kb', label: 'Help Center', icon: BookOpen, roles: ['Customer'] },
     ],
   },
   {

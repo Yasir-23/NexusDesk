@@ -1,11 +1,21 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '../stores/auth';
 import { resetToasts } from '../stores/toast';
+import { installFakeHubs, resetFakeHubs } from './fakeHub';
+
+// Unit tests never open real SignalR connections: a fake hub records invocations and lets
+// tests emit server events. The live suite (`npm run test:live`) uses the real client.
+const LIVE = process.env.NEXUSDESK_LIVE === '1';
+
+beforeEach(() => {
+  if (!LIVE) installFakeHubs();
+});
 
 afterEach(() => {
   cleanup();
+  if (!LIVE) resetFakeHubs();
   localStorage.clear();
   useAuthStore.setState({ accessToken: null, refreshToken: null, expiresAt: null, user: null, tenantSubdomain: null });
   resetToasts();

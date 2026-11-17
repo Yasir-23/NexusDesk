@@ -14,7 +14,7 @@ export interface MockCall {
   body: unknown;
 }
 
-type Reply = { status?: number; body?: unknown; contentType?: string };
+type Reply = { status?: number; body?: unknown; contentType?: string; headers?: Record<string, string> };
 type Handler = (call: MockCall) => Reply | undefined;
 
 /**
@@ -50,7 +50,10 @@ export function mockFetch(routes: Record<string, Reply | Handler>) {
     const text = reply.body === undefined ? '' : typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body);
     return new Response(status === 204 ? null : text, {
       status,
-      headers: { 'Content-Type': reply.contentType ?? (status >= 400 ? 'application/problem+json' : 'application/json') },
+      headers: {
+        'Content-Type': reply.contentType ?? (status >= 400 ? 'application/problem+json' : 'application/json'),
+        ...reply.headers,
+      },
     });
   });
   vi.stubGlobal('fetch', fn);
@@ -88,6 +91,14 @@ export const USERS: Record<string, AuthUser> = {
     email: 'admin@acme.com',
     fullName: 'Acme Admin',
     role: 'TenantAdmin',
+    tenantId: 'b7e43bc4-a5c7-4c8f-a470-7277ce9823f4',
+    subdomain: 'acme',
+  },
+  acmeAgent: {
+    id: '22222222-2222-2222-2222-222222222222',
+    email: 'agent@acme.com',
+    fullName: 'Acme Agent',
+    role: 'Agent',
     tenantId: 'b7e43bc4-a5c7-4c8f-a470-7277ce9823f4',
     subdomain: 'acme',
   },
