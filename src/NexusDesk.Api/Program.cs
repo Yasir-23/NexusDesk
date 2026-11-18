@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -37,6 +38,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Service Defaults (OpenTelemetry, Resilience, Health Checks, Service Discovery)
 builder.AddServiceDefaults();
+
+// 1b. Data Protection: persist the key ring to a stable, gitignored directory with a fixed
+// application name so ciphertext (dedicated tenant connection strings, PII, webhook secrets)
+// stays decryptable across restarts and across processes (API, test hosts).
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(System.IO.Path.Combine(builder.Environment.ContentRootPath, ".dataprotection-keys")))
+    .SetApplicationName("NexusDesk");
 
 // 2. Exception Handling
 builder.Services.AddProblemDetails();

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using NexusDesk.SharedKernel.MultiTenancy;
+using Npgsql;
 
 namespace NexusDesk.Modules.Tenants.Persistence;
 
@@ -45,11 +46,30 @@ public sealed class TenantConnectionResolver : ITenantConnectionResolver
             }
             catch
             {
-                // Fallback if raw or protection key mismatch in test scenarios
-                return tenantContext.CustomConnectionString;
+                // Raw (unencrypted) connection string, e.g. in test scenarios
+                if (tenantContext.CustomConnectionString.Contains('='))
+                {
+                    return tenantContext.CustomConnectionString;
+                }
+
+                // Ciphertext from a different key ring: never hand it to Npgsql as a connection
+                // string. Fall back to the deterministic dedicated database for this tenant.
+                if (!string.IsNullOrWhiteSpace(tenantContext.Subdomain))
+                {
+                    return new NpgsqlConnectionStringBuilder(GetDefaultConnectionString())
+                    {
+                        Database = GetDedicatedDatabaseName(tenantContext.Subdomain)
+                    }.ConnectionString;
+                }
+
+                throw new InvalidOperationException(
+                    "Dedicated tenant connection string could not be decrypted with the current Data Protection key ring.");
             }
         }
 
         return GetDefaultConnectionString();
     }
+
+    public static string GetDedicatedDatabaseName(string subdomain) =>
+        $"nexusdesk_tenant_{subdomain.Trim().ToLowerInvariant()}";
 }

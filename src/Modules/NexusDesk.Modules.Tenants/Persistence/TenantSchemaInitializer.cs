@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.DataProtection;
+using NexusDesk.Modules.Tenants.Caching;
 using Npgsql;
 
 namespace NexusDesk.Modules.Tenants.Persistence;
@@ -10,10 +12,72 @@ public interface ITenantSchemaInitializer
 public sealed class TenantSchemaInitializer : ITenantSchemaInitializer
 {
     private readonly ITenantConnectionResolver _connectionResolver;
+    private readonly IDataProtector _protector;
+    private readonly ITenantCache? _tenantCache;
 
-    public TenantSchemaInitializer(ITenantConnectionResolver connectionResolver)
+    public TenantSchemaInitializer(
+        ITenantConnectionResolver connectionResolver,
+        IDataProtectionProvider dataProtectionProvider,
+        ITenantCache? tenantCache = null)
     {
         _connectionResolver = connectionResolver;
+        _protector = dataProtectionProvider.CreateProtector(TenantConnectionResolver.DataProtectionPurpose);
+        _tenantCache = tenantCache;
+    }
+
+    /// <summary>
+    /// Re-encrypts each DedicatedDatabase tenant's connection string when the stored ciphertext
+    /// cannot be unprotected with the current key ring (e.g. keys were rotated, regenerated, or
+    /// previously ephemeral). The dedicated database name is deterministic
+    /// (<c>nexusdesk_tenant_{subdomain}</c>), so the connection string can be rebuilt safely.
+    /// </summary>
+    private async Task HealDedicatedConnectionStringsAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        var dedicated = new List<(Guid Id, string Subdomain, string? Cipher)>();
+        await using (var selectCmd = new NpgsqlCommand(
+            "SELECT id, subdomain, custom_connection_string FROM tenants.tenants WHERE isolation_strategy = 'DedicatedDatabase';",
+            connection))
+        await using (var reader = await selectCmd.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                dedicated.Add((reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+        }
+
+        foreach (var (id, subdomain, cipher) in dedicated)
+        {
+            if (!string.IsNullOrWhiteSpace(cipher))
+            {
+                try
+                {
+                    _protector.Unprotect(cipher);
+                    continue; // Readable with the current key ring
+                }
+                catch
+                {
+                    // Fall through and re-encrypt
+                }
+            }
+
+            var rebuilt = new NpgsqlConnectionStringBuilder(_connectionResolver.GetDefaultConnectionString())
+            {
+                Database = TenantConnectionResolver.GetDedicatedDatabaseName(subdomain)
+            }.ConnectionString;
+
+            await using (var updateCmd = new NpgsqlCommand(
+                "UPDATE tenants.tenants SET custom_connection_string = @conn WHERE id = @id;", connection))
+            {
+                updateCmd.Parameters.AddWithValue("conn", _protector.Protect(rebuilt));
+                updateCmd.Parameters.AddWithValue("id", id);
+                await updateCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            if (_tenantCache != null)
+            {
+                await _tenantCache.InvalidateAsync(id, subdomain, cancellationToken);
+            }
+        }
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -115,6 +179,8 @@ public sealed class TenantSchemaInitializer : ITenantSchemaInitializer
 
             await using var cmd = new NpgsqlCommand(sql, connection);
             await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+            await HealDedicatedConnectionStringsAsync(connection, cancellationToken);
         }
         catch (PostgresException ex) when (ex.SqlState == "23505")
         {

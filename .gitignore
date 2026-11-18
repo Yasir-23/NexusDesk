@@ -39,3 +39,6 @@ Thumbs.db
 
 # Aspire / Diagnostics
 .aspire/
+
+# ASP.NET Core Data Protection key ring (local, never commit)
+.dataprotection-keys/
