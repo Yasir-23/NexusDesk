@@ -524,3 +524,298 @@ export interface ChatTypingIndicatorEvent {
   userName: string | null;
   isTyping: boolean;
 }
+
+// ---------- Module 1: Privacy ----------
+
+/** `POST /api/v1/privacy/forget-me`. */
+export interface ForgetMeResponse {
+  anonymized: boolean;
+  userId: string;
+  anonymizedAtUtc: string;
+}
+
+// ---------- Module 2: Agents ----------
+
+/** `POST /api/v1/users/agents` (422 `PLAN_AGENT_LIMIT_EXCEEDED` when the plan quota is used up). */
+export interface CreateAgentRequest {
+  email: string;
+  fullName: string;
+  password: string;
+  phoneNumber?: string;
+}
+
+export interface CreateAgentResponse {
+  id: string;
+  tenantId: string;
+  email: string;
+  fullName: string;
+  phoneNumber: string | null;
+  role: Role;
+  isActive: boolean;
+  createdAtUtc: string;
+}
+
+// ---------- Module 4: Customer Portal ----------
+
+export interface PortalCreateTicketRequest {
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  tags: string[];
+}
+
+/** `POST /api/v1/portal/tickets/{id}/replies`. */
+export interface PortalReplyRequest {
+  message: string;
+}
+
+export interface PortalTicketListQuery {
+  status?: TicketStatus;
+  page: number;
+  pageSize: number;
+}
+
+// ---------- Module 6: SLA, Automation, Webhooks/Outbox/DLQ ----------
+
+export interface UpsertSlaPolicyRequest {
+  priority: TicketPriority;
+  firstResponseTargetMinutes: number;
+  resolutionTargetMinutes: number;
+}
+
+export interface SlaPolicy extends UpsertSlaPolicyRequest {
+  id: string;
+  tenantId: string;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+/**
+ * Values the backend validator accepts (`AutomationRule.SupportedTriggerEvents` /
+ * `SupportedActionTypes`). The contract's `ticket.created` / `assign_to_tier2` example is
+ * rejected with 400 `AutomationRule.UnsupportedTrigger`, so the UI only offers these.
+ */
+export type AutomationTriggerEvent = 'TicketCreated' | 'TicketSlaBreached' | 'TicketPriorityChanged';
+export type AutomationActionType = 'EscalatePriority' | 'AssignAgent' | 'AddInternalNote';
+export const AUTOMATION_TRIGGERS: AutomationTriggerEvent[] = ['TicketCreated', 'TicketSlaBreached', 'TicketPriorityChanged'];
+export const AUTOMATION_ACTIONS: AutomationActionType[] = ['EscalatePriority', 'AssignAgent', 'AddInternalNote'];
+
+export interface CreateAutomationRuleRequest {
+  name: string;
+  triggerEvent: string;
+  conditionJson: string;
+  actionType: string;
+  actionPayloadJson: string;
+  isEnabled: boolean;
+}
+
+export interface AutomationRule extends CreateAutomationRuleRequest {
+  id: string;
+  tenantId: string;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface ToggleAutomationRuleRequest {
+  isEnabled: boolean;
+}
+
+export type WebhookEventType = 'ticket.created' | 'ticket.sla_breached' | 'ticket.resolved';
+export const WEBHOOK_EVENT_TYPES: WebhookEventType[] = ['ticket.created', 'ticket.sla_breached', 'ticket.resolved'];
+
+export interface CreateWebhookRequest {
+  targetUrl: string;
+  secret: string;
+  eventTypes: string[];
+  isActive: boolean;
+}
+
+export interface WebhookSubscription {
+  id: string;
+  tenantId: string;
+  targetUrl: string;
+  eventTypes: string[];
+  isActive: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+/**
+ * Outbox status. The contract lists `Pending` / `Dispatched` / `Failed`; the backend enum
+ * (`OutboxMessageStatus`) actually serializes `Pending` / `Processed` / `DeadLettered`.
+ * Both spellings are handled by the UI.
+ */
+export type OutboxStatus = 'Pending' | 'Processed' | 'DeadLettered' | 'Dispatched' | 'Failed';
+
+export interface OutboxMessage {
+  id: string;
+  tenantId: string;
+  eventType: string;
+  payloadJson: string;
+  status: OutboxStatus;
+  retryCount: number;
+  nextRetryAtUtc: string;
+  lastError: string | null;
+  createdAtUtc: string;
+  processedAtUtc: string | null;
+}
+
+export interface DeadLetterWebhook {
+  id: string;
+  tenantId: string;
+  outboxMessageId: string;
+  webhookSubscriptionId: string;
+  targetUrl: string;
+  eventType: string;
+  payloadJson: string;
+  attemptCount: number;
+  lastHttpStatusCode: number | null;
+  lastError: string;
+  failedAtUtc: string;
+}
+
+// ---------- Module 8: Billing ----------
+
+/**
+ * Billing plan code. The contract lists Free / Pro / Enterprise, but the live catalog can hold
+ * more (v1.0.0 also seeds `Starter`), so unknown codes are allowed.
+ */
+export type PlanCode = TenantPlanTier | (string & {});
+
+export interface SubscriptionPlan {
+  id: string;
+  code: PlanCode;
+  name: string;
+  monthlyPriceCents: number;
+  maxAgents: number;
+  maxMonthlyTickets: number;
+  maxMonthlyAiTokens: number;
+  customBrandingEnabled: boolean;
+  webhooksEnabled: boolean;
+  slaEnabled: boolean;
+  isActive: boolean;
+}
+
+export type BillingCycle = 'Monthly' | 'Annual';
+
+export interface TenantSubscription {
+  id: string;
+  tenantId: string;
+  planCode: PlanCode;
+  status: string;
+  billingCycle: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  currentPeriodStartUtc: string;
+  currentPeriodEndUtc: string;
+  cancelAtPeriodEnd: boolean;
+  updatedAtUtc: string;
+}
+
+export type UsageMetricName = 'active_agents' | 'tickets_created' | 'ai_tokens_used';
+
+export interface MetricUsage {
+  metricName: UsageMetricName | string;
+  used: number;
+  /** `-1` means unlimited (e.g. `webhook_deliveries`). */
+  limit: number;
+  remaining: number;
+  usagePercentage: number;
+  remainingPercentage: number;
+}
+
+export interface TenantSubscriptionDetails {
+  subscription: TenantSubscription;
+  plan: SubscriptionPlan;
+  periodKey: string;
+  usage: MetricUsage[];
+}
+
+export interface ChangePlanRequest {
+  planCode: PlanCode;
+  billingCycle: string;
+}
+
+// ---------- Module 9: Analytics, Audit, Notifications ----------
+
+export interface AnalyticsOverview {
+  totalTickets: number;
+  openTickets: number;
+  resolvedTickets: number;
+  slaComplianceRate: number;
+  averageFirstResponseMinutes: number;
+  averageResolutionMinutes: number;
+  csatAverageScore: number;
+  activeChatSessions: number;
+  publishedKbArticles: number;
+}
+
+export interface DailyTicketTrend {
+  date: string;
+  createdCount: number;
+  resolvedCount: number;
+  breachedCount: number;
+}
+
+export interface AgentPerformance {
+  agentUserId: string;
+  agentName: string;
+  assignedTickets: number;
+  resolvedTickets: number;
+  averageResolutionMinutes: number;
+  slaComplianceRate: number;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  tenantId: string;
+  actorUserId: string | null;
+  actorEmail: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  metadataJson: string | null;
+  ipAddress: string | null;
+  createdAtUtc: string;
+}
+
+export interface PagedAuditLogsResponse {
+  items: AuditLogEntry[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface AuditLogQuery {
+  actorEmail?: string;
+  resourceType?: string;
+  page: number;
+  pageSize: number;
+}
+
+export interface UserNotification {
+  id: string;
+  tenantId: string;
+  recipientUserId: string;
+  type: string;
+  title: string;
+  message: string;
+  linkUrl: string | null;
+  isRead: boolean;
+  readAtUtc: string | null;
+  createdAtUtc: string;
+}
+
+export interface PagedNotificationsResponse {
+  items: UserNotification[];
+  unreadCount: number;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface MarkAllNotificationsReadResponse {
+  markedCount: number;
+}

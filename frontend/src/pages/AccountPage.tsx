@@ -5,6 +5,7 @@ import { Badge, Card, CardBody, CardHeader, ErrorPanel, Skeleton } from '../comp
 import { formatDateTime } from '../lib/format';
 import { useMe } from '../lib/queries';
 import { useAuthStore } from '../stores/auth';
+import { PrivacyCard } from './account/PrivacyCard';
 
 /** `GET /api/v1/auth/me` — profile and effective permissions. */
 export function AccountPage() {
@@ -72,6 +73,7 @@ export function AccountPage() {
               </p>
             </CardBody>
           </Card>
+          {data.role !== 'SuperAdmin' && <PrivacyCard email={data.email} />}
         </div>
       )}
     </>

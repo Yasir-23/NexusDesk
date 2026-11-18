@@ -28,6 +28,7 @@ export const ticketKeys = {
   detailRoot: (id: string) => ['tickets', 'detail', id] as const,
   detail: (id: string, scope: SessionScope) => ['tickets', 'detail', id, scope] as const,
   attachments: (id: string, scope: SessionScope) => ['tickets', 'attachments', id, scope] as const,
+  usersRoot: ['users', 'list'] as const,
   users: (scope: SessionScope) => ['users', 'list', scope] as const,
 };
 

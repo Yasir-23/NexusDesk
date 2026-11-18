@@ -16,9 +16,10 @@ export function DashboardPage() {
   const { data, isLoading, error, refetch } = useTenantCurrent();
   const ctx = data?.tenantContext;
   const dedicated = ctx?.isolationStrategy === 'DedicatedDatabase';
-  const upcoming = navFor(user.role)
+  const shortcuts = navFor(user.role)
+    .filter((s) => s.title === 'Workspace' || s.title === 'Administration')
     .flatMap((s) => s.items)
-    .filter((i) => i.milestone);
+    .filter((i) => i.to !== '/dashboard');
 
   return (
     <>
@@ -133,9 +134,9 @@ export function DashboardPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Coming next" description="Wired routes, implemented in upcoming milestones" icon={<Network className="h-4 w-4" />} />
+            <CardHeader title="Quick links" description="Jump straight into a workspace" icon={<Network className="h-4 w-4" />} />
             <CardBody className="space-y-1.5 p-3">
-              {upcoming.map((i) => (
+              {shortcuts.map((i) => (
                 <Link
                   key={i.to}
                   to={i.to}
@@ -143,7 +144,6 @@ export function DashboardPage() {
                 >
                   <i.icon className="h-4 w-4 text-zinc-400" />
                   <span className="flex-1">{i.label}</span>
-                  <span className="text-[10px] font-medium text-zinc-400">M{i.milestone}</span>
                 </Link>
               ))}
               {data && (

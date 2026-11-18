@@ -35,8 +35,6 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   roles: Role[];
-  /** Milestone that implements the page; omitted = live now. */
-  milestone?: 3;
 }
 
 export interface NavSection {
@@ -62,17 +60,17 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: '/tickets', label: 'Tickets', icon: Ticket, roles: STAFF },
       { to: '/chat', label: 'Live Chat', icon: MessagesSquare, roles: STAFF },
       { to: '/kb', label: 'Knowledge Base', icon: BookOpen, roles: STAFF },
-      { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: STAFF, milestone: 3 },
+      { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: STAFF },
     ],
   },
   {
     title: 'Administration',
     items: [
-      { to: '/admin/sla', label: 'SLA Policies', icon: Timer, roles: ADMIN, milestone: 3 },
-      { to: '/admin/automation', label: 'Automation', icon: Workflow, roles: ADMIN, milestone: 3 },
-      { to: '/admin/webhooks', label: 'Webhooks & DLQ', icon: Webhook, roles: ADMIN, milestone: 3 },
-      { to: '/admin/billing', label: 'Billing & Usage', icon: CreditCard, roles: ADMIN, milestone: 3 },
-      { to: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: ADMIN, milestone: 3 },
+      { to: '/admin/sla', label: 'SLA Policies', icon: Timer, roles: ADMIN },
+      { to: '/admin/automation', label: 'Automation', icon: Workflow, roles: ADMIN },
+      { to: '/admin/webhooks', label: 'Webhooks & DLQ', icon: Webhook, roles: ADMIN },
+      { to: '/admin/billing', label: 'Billing & Usage', icon: CreditCard, roles: ADMIN },
+      { to: '/admin/audit', label: 'Audit Log', icon: ScrollText, roles: ADMIN },
     ],
   },
   {

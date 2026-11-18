@@ -1,13 +1,14 @@
 import { Database, DatabaseZap, Globe, Layers } from 'lucide-react';
 import { Badge, type BadgeTone } from '../ui';
 import { ROLE_META } from '../../lib/navigation';
-import type { IsolationStrategy, Role, TenantPlanTier, TenantStatus } from '../../lib/types';
+import type { IsolationStrategy, PlanCode, Role, TenantPlanTier, TenantStatus } from '../../lib/types';
 
 const planTones: Record<TenantPlanTier, BadgeTone> = { Free: 'neutral', Pro: 'indigo', Enterprise: 'violet' };
+const toneFor = (plan: PlanCode): BadgeTone => planTones[plan as TenantPlanTier] ?? 'sky';
 
-export function PlanBadge({ plan }: { plan: TenantPlanTier }) {
+export function PlanBadge({ plan }: { plan: PlanCode }) {
   return (
-    <Badge tone={planTones[plan] ?? 'neutral'} icon={<Layers className="h-3 w-3" aria-hidden />}>
+    <Badge tone={toneFor(plan)} icon={<Layers className="h-3 w-3" aria-hidden />}>
       {plan}
     </Badge>
   );

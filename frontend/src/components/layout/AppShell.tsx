@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AccountMenu } from './AccountMenu';
 import { Logo } from './Logo';
+import { NotificationBell } from './NotificationBell';
 import { RealtimeBridge, RealtimeIndicator } from './Realtime';
 import { TenantContextBadge } from './TenantContextBadge';
 import { navFor } from '../../lib/navigation';
@@ -28,7 +29,6 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
-                    end={item.to === '/portal'}
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
@@ -41,11 +41,6 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     <item.icon className="h-4 w-4 shrink-0" aria-hidden />
                     <span className="flex-1 truncate">{item.label}</span>
-                    {item.milestone && (
-                      <span className="rounded px-1.5 text-[10px] font-medium text-zinc-400 ring-1 ring-inset ring-zinc-200 dark:ring-zinc-700">
-                        M{item.milestone}
-                      </span>
-                    )}
                   </NavLink>
                 </li>
               ))}
@@ -108,6 +103,7 @@ export function AppShell() {
           </div>
           <div className="ml-auto flex items-center gap-1">
             <RealtimeIndicator />
+            <NotificationBell />
             <button
               type="button"
               onClick={toggle}

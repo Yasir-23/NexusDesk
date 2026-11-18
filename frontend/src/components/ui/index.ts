@@ -6,3 +6,4 @@ export * from './Dialog';
 export * from './Table';
 export * from './Toaster';
 export * from './Feedback';
+export * from './Controls';
